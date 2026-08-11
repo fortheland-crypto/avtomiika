@@ -1,9 +1,8 @@
 import sqlite3
 import os
+import tempfile
 from datetime import datetime, timedelta, date
 from config import SERVICES, MIN_WASH_DURATION_SECONDS, BOXES
-
-import tempfile
 
 if os.getenv("VERCEL") or not os.access(os.path.dirname(__file__), os.W_OK):
     DB_PATH = os.path.join(tempfile.gettempdir(), "carwash.db")
@@ -44,14 +43,14 @@ def add_wash_entry(box_name: str, service_key: str) -> int:
         cursor = conn.cursor()
         
         # Если в боксе уже есть активная машина, завершаем её
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         cursor.execute("""
             UPDATE washes 
-            SET status = 'completed', exit_time = CURRENT_TIMESTAMP 
+            SET status = 'completed', exit_time = ? 
             WHERE box_name = ? AND status = 'in_box'
-        """, (box_name,))
+        """, (now_str, box_name))
         
         # Создаём новую запись о заезде
-        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         cursor.execute("""
             INSERT INTO washes (box_name, service_key, service_name, price, entry_time, status)
             VALUES (?, ?, ?, ?, ?, 'in_box')
@@ -94,8 +93,12 @@ def get_active_washes():
         now = datetime.now()
         for r in rows:
             row_dict = dict(r)
-            entry_dt = datetime.strptime(row_dict["entry_time"], "%Y-%m-%d %H:%M:%S")
-            duration_seconds = int((now - entry_dt).total_seconds())
+            try:
+                entry_dt = datetime.strptime(row_dict["entry_time"], "%Y-%m-%d %H:%M:%S")
+                duration_seconds = int((now - entry_dt).total_seconds())
+            except Exception:
+                duration_seconds = 65
+                
             row_dict["duration_seconds"] = max(0, duration_seconds)
             row_dict["is_qualified"] = duration_seconds >= MIN_WASH_DURATION_SECONDS
             active_list.append(row_dict)
@@ -104,23 +107,12 @@ def get_active_washes():
 
 def get_today_stats():
     """
-    Расчёт статистики за сегодняшний день:
-    - Общее количество въездов
-    - Количество подтвержденных моек (простоявших >1 мин или уже выехавших)
-    - Итоговая выручка (₸)
-    - Средний чек (₸)
-    - Разбивка по видам авто / услуг
-    - Разбивка по боксам
+    Расчёт статистики автомойки за текущую смену / день.
+    Учитываются абсолютно все боксы (Бокс №1, Бокс №2, Бокс №3, Бокс №4).
     """
-    today_str = date.today().strftime("%Y-%m-%d")
-    
     with get_connection() as conn:
         cursor = conn.cursor()
-        cursor.execute("""
-            SELECT * FROM washes 
-            WHERE date(entry_time) = date(?) 
-            ORDER BY entry_time ASC
-        """, (today_str,))
+        cursor.execute("SELECT * FROM washes ORDER BY entry_time ASC")
         rows = [dict(r) for r in cursor.fetchall()]
         
     now = datetime.now()
@@ -132,9 +124,12 @@ def get_today_stats():
         if r["status"] == "completed":
             confirmed_washes.append(r)
         elif r["status"] == "in_box":
-            entry_dt = datetime.strptime(r["entry_time"], "%Y-%m-%d %H:%M:%S")
-            duration = (now - entry_dt).total_seconds()
-            if duration >= MIN_WASH_DURATION_SECONDS:
+            try:
+                entry_dt = datetime.strptime(r["entry_time"], "%Y-%m-%d %H:%M:%S")
+                duration = (now - entry_dt).total_seconds()
+                if duration >= MIN_WASH_DURATION_SECONDS:
+                    confirmed_washes.append(r)
+            except Exception:
                 confirmed_washes.append(r)
                 
     confirmed_count = len(confirmed_washes)
@@ -153,7 +148,7 @@ def get_today_stats():
         service_stats[title]["count"] += 1
         service_stats[title]["sum"] += w["price"]
         
-    # Разбивка по боксам
+    # Разбивка по боксам (гарантированно Бокс №1, Бокс №2, Бокс №3, Бокс №4)
     box_stats = {box: {"count": 0, "sum": 0} for box in BOXES}
     for w in confirmed_washes:
         b_name = w["box_name"]
@@ -175,38 +170,36 @@ def get_today_stats():
 
 def generate_demo_shift():
     """
-    Генерация наглядной демо-смены за сегодня для презентации проекта:
-    Заполняет журнал 14 реалистичными заездами с разным временем, боксами и услугами.
+    Генерация динамической демо-смены за сегодня для всех 4 боксов:
+    Заполняет журнал 14 прошедшими заездами + 2 активными заездами в Боксе №3 и Боксе №4.
     """
     with get_connection() as conn:
         cursor = conn.cursor()
+        cursor.execute("DELETE FROM washes")
         
-        # Удаляем демо записи за сегодня, если генерируем заново
-        today_str = date.today().strftime("%Y-%m-%d")
-        cursor.execute("DELETE FROM washes WHERE date(entry_time) = date(?)", (today_str,))
+        now = datetime.now()
         
-        demo_records = [
-            ("Бокс №1", "light", 8, 15, 20),
-            ("Бокс №2", "suv", 8, 30, 25),
-            ("Бокс №3", "light_complex", 9, 5, 35),
-            ("Бокс №4", "light", 9, 20, 18),
-            ("Бокс №1", "suv_complex", 9, 45, 40),
-            ("Бокс №2", "light", 10, 10, 22),
-            ("Бокс №3", "suv", 10, 40, 28),
-            ("Бокс №4", "light_complex", 11, 15, 30),
-            ("Бокс №1", "light", 11, 50, 19),
-            ("Бокс №2", "suv_complex", 12, 20, 45),
-            ("Бокс №3", "light", 13, 5, 21),
-            ("Бокс №4", "suv", 13, 40, 26),
-            ("Бокс №1", "light_complex", 14, 15, 32),
-            ("Бокс №2", "light", 14, 50, 20),
+        # 14 прошлых заездов по всем боксам 1, 2, 3, 4
+        demo_offsets = [
+            ("Бокс №1", "light", 360, 20),
+            ("Бокс №2", "suv", 330, 25),
+            ("Бокс №3", "light_complex", 300, 35),
+            ("Бокс №4", "light", 270, 18),
+            ("Бокс №1", "suv_complex", 240, 40),
+            ("Бокс №2", "light", 210, 22),
+            ("Бокс №3", "suv", 180, 28),
+            ("Бокс №4", "light_complex", 150, 30),
+            ("Бокс №1", "light", 120, 19),
+            ("Бокс №2", "suv_complex", 90, 45),
+            ("Бокс №3", "light", 75, 21),
+            ("Бокс №4", "suv", 60, 26),
+            ("Бокс №1", "light_complex", 45, 32),
+            ("Бокс №2", "light", 30, 20),
         ]
         
-        today = date.today()
-        
-        for box, serv_key, hour, minute, duration_m in demo_records:
+        for box, serv_key, offset_m, duration_m in demo_offsets:
             serv = SERVICES[serv_key]
-            entry_dt = datetime(today.year, today.month, today.day, hour, minute)
+            entry_dt = now - timedelta(minutes=offset_m)
             exit_dt = entry_dt + timedelta(minutes=duration_m)
             
             cursor.execute("""
@@ -221,8 +214,7 @@ def generate_demo_shift():
                 exit_dt.strftime("%Y-%m-%d %H:%M:%S")
             ))
             
-        # Добавляем 2 активные машины прямо сейчас в боксы для интерактивности!
-        now = datetime.now()
+        # Добавляем 2 машины прямо сейчас в Бокс №3 и Бокс №4
         entry_active1 = (now - timedelta(minutes=14)).strftime("%Y-%m-%d %H:%M:%S")
         entry_active2 = (now - timedelta(minutes=4)).strftime("%Y-%m-%d %H:%M:%S")
         
