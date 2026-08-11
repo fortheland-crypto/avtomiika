@@ -3,11 +3,10 @@ from config import BOXES, SERVICES
 from database import get_active_washes
 
 def get_main_keyboard() -> ReplyKeyboardMarkup:
-    """Главная клавиатура бота"""
+    """Главная клавиатура бота (без демо-смены)"""
     kb = [
         [KeyboardButton(text="🚗 Зафиксировать въезд"), KeyboardButton(text="⏱ Машины в боксах")],
-        [KeyboardButton(text="📊 Статистика за сегодня"), KeyboardButton(text="📋 Журнал смены")],
-        [KeyboardButton(text="⚡ Демо-смена")]
+        [KeyboardButton(text="📊 Статистика за сегодня"), KeyboardButton(text="📋 Журнал смены")]
     ]
     return ReplyKeyboardMarkup(keyboard=kb, resize_keyboard=True)
 

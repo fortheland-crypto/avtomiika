@@ -16,7 +16,6 @@ from database import (
     complete_wash,
     get_active_washes,
     get_today_stats,
-    generate_demo_shift,
     get_wash_by_id,
     get_now,
     TZ_OFFSET
@@ -53,7 +52,7 @@ async def cmd_start(message: Message, state: FSMContext):
         "• 🚙 **Джип / Большая машина**: 5 000 ₸\n"
         "• 🚗✨ **Легковая (Комплекс)**: 4 500 ₸\n"
         "• 🚙✨ **Джип (Комплекс)**: 7 000 ₸\n\n"
-        "💡 *Для демонстрации нажимайте «⚡ Демо-смена», чтобы мгновенно наполнить базу за сегодняшний день!*"
+        "💡 *Используйте кнопки меню внизу для управления заездами и отчётами.*"
     )
     await message.answer(text, reply_markup=get_main_keyboard(), parse_mode="Markdown")
 
@@ -248,47 +247,50 @@ async def refresh_active_callback(callback: CallbackQuery):
 
 @router.callback_query(F.data.startswith("finish_wash:"))
 async def finish_wash_callback(callback: CallbackQuery):
-    """Отметка о выезде машины из бокса и закрытие чека по времени UTC+5"""
+    """Отметка о выезде машины из бокса с всплывающим окном и закрытием заявки"""
     wash_id = int(callback.data.split(":")[1])
     wash_data = get_wash_by_id(wash_id)
     
     if not wash_data:
-        await callback.answer("Запись не найдена", show_alert=True)
+        await callback.answer("⚠️ Заявка уже была закрыта ранее.", show_alert=True)
         return
         
-    completed = complete_wash(wash_id)
+    complete_wash(wash_id)
     
-    if completed:
-        now = get_now()
-        now_time = now.strftime("%H:%M:%S")
-        try:
-            clean_time = wash_data["entry_time"].split(".")[0].split("+")[0]
-            entry_dt = datetime.strptime(clean_time, "%Y-%m-%d %H:%M:%S").replace(tzinfo=TZ_OFFSET)
-            total_seconds = int((now - entry_dt).total_seconds())
-            dur_str = format_seconds(total_seconds)
-        except Exception:
-            dur_str = "15 мин"
-            
-        car_num = wash_data.get('car_number', '—')
+    now = get_now()
+    now_time = now.strftime("%H:%M:%S")
+    try:
+        clean_time = wash_data["entry_time"].split(".")[0].split("+")[0]
+        entry_dt = datetime.strptime(clean_time, "%Y-%m-%d %H:%M:%S").replace(tzinfo=TZ_OFFSET)
+        total_seconds = int((now - entry_dt).total_seconds())
+        dur_str = format_seconds(total_seconds)
+    except Exception:
+        dur_str = "15 мин"
         
-        text = (
-            f"🧾 **ЧЕК ЗАКРЫТ (ВЫЕЗД ИЗ БОКСА)**\n\n"
-            f"📍 **Бокс**: {wash_data['box_name']}\n"
-            f"🔢 **Номер авто**: **{car_num}**\n"
-            f"🚗 **Категория**: {wash_data['service_name']}\n"
-            f"💰 **К оплате**: **{format_currency(wash_data['price'])}**\n"
-            f"⏱ **Общее время в боксе**: **{dur_str}**\n"
-            f"🕒 **Время выезда**: **{now_time}** *(UTC+5)*"
-        )
+    car_num = wash_data.get('car_number', '—')
+    
+    text = (
+        f"🧾 **ЧЕК ЗАКРЫТ (МАШИНА ВЫЕХАЛА)**\n\n"
+        f"📍 **Бокс**: {wash_data['box_name']}\n"
+        f"🔢 **Номер авто**: **{car_num}**\n"
+        f"🚗 **Категория**: {wash_data['service_name']}\n"
+        f"💰 **К оплате**: **{format_currency(wash_data['price'])}**\n"
+        f"⏱ **Время на мойке**: **{dur_str}**\n"
+        f"🕒 **Время выезда**: **{now_time}** *(UTC+5)*"
+    )
+    
+    # 1. Показываем всплывающее модальное диалоговое окно в Telegram!
+    await callback.answer("🏁 Заявка закрыта! Выезд зафиксирован.", show_alert=True)
+    
+    # 2. Обновляем сообщение (редактируем текстом закрытого чека)
+    try:
+        if callback.message and "Въезд зафиксирован" in (callback.message.text or ""):
+            await callback.message.edit_text(text, parse_mode="Markdown", reply_markup=None)
+        else:
+            await callback.message.answer(text, parse_mode="Markdown")
+            await refresh_active_callback(callback)
+    except Exception:
         await callback.message.answer(text, parse_mode="Markdown")
-        await callback.answer("🏁 Выезд зафиксирован! Чек закрыт.")
-        
-        try:
-            await callback.message.delete_reply_markup()
-        except Exception:
-            pass
-    else:
-        await callback.answer("Машина уже выехала из бокса.")
 
 @router.message(F.text == "📊 Статистика за сегодня")
 async def show_today_stats(message: Message, state: FSMContext):
@@ -339,22 +341,6 @@ async def show_shift_log(message: Message, state: FSMContext):
         )
         
     await message.answer("\n".join(lines), parse_mode="Markdown")
-
-@router.message(F.text == "⚡ Демо-смена")
-@router.message(Command("demo"))
-async def setup_demo_shift(message: Message, state: FSMContext):
-    """Генерация демо-данных смены с 3-значными номерами для презентации"""
-    await state.clear()
-    generate_demo_shift()
-    
-    text_notice = (
-        "⚡ **Демо-смена успешно сгенерирована!**\n\n"
-        "В базу добавлено 14 прошедших заездов авто за сегодня по локальному времени (UTC+5) "
-        "с 3-значными номерами (например: №542, №109, №777) + 2 активные машины (№307 и №542) в Боксе №3 и Боксе №4!\n\n"
-        "Ниже сформирован готовый аналитический отчёт:"
-    )
-    await message.answer(text_notice, parse_mode="Markdown")
-    await show_today_stats(message, state)
 
 @router.callback_query(F.data == "cancel_action")
 async def cancel_action_callback(callback: CallbackQuery, state: FSMContext):
