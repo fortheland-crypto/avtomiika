@@ -3,7 +3,6 @@ import sys
 import tempfile
 import traceback
 
-# Добавляем корневую директорию проекта в sys.path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from fastapi import FastAPI, Request
@@ -21,7 +20,6 @@ from handlers import router
 
 app = FastAPI()
 
-# Глобальный Dispatcher инициализируется один раз
 dp = Dispatcher()
 dp.include_router(router)
 
