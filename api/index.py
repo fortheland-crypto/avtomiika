@@ -46,6 +46,7 @@ async def root_status():
 @app.post("/api/webhook")
 async def telegram_webhook(request: Request):
     """Обработчик входящих вебхуков от Telegram API"""
+    bot = None
     try:
         bot = get_telegram_bot()
         init_db()
@@ -60,11 +61,15 @@ async def telegram_webhook(request: Request):
             "message": str(e),
             "traceback": traceback.format_exc()
         }
+    finally:
+        if bot:
+            await bot.session.close()
 
 @app.get("/set_webhook")
 @app.get("/api/set_webhook")
 async def set_webhook(request: Request):
     """Эндпоинт для авто-регистрации вебхука в Telegram"""
+    bot = None
     try:
         bot = get_telegram_bot()
         host = request.headers.get("host")
@@ -79,3 +84,6 @@ async def set_webhook(request: Request):
         }
     except Exception as e:
         return {"success": False, "error": str(e), "traceback": traceback.format_exc()}
+    finally:
+        if bot:
+            await bot.session.close()
