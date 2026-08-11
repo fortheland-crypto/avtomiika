@@ -44,6 +44,12 @@ def init_db():
             pass
         conn.commit()
 
+        cursor.execute("SELECT COUNT(*) FROM washes")
+        count = cursor.fetchone()[0]
+
+    if count == 0:
+        generate_demo_shift()
+
 def add_wash_entry(box_name: str, service_key: str, car_number: str = "—") -> int:
     """Фиксация заезда машины с 3-значным номером в бокс по локальному времени UTC+5"""
     if service_key not in SERVICES:

@@ -11,8 +11,8 @@
     <style>
         :root {
             --bg-gradient: linear-gradient(135deg, #0b0f19 0%, #111827 50%, #0f172a 100%);
-            --card-bg: rgba(30, 41, 59, 0.7);
-            --card-border: rgba(255, 255, 255, 0.1);
+            --card-bg: rgba(15, 23, 42, 0.72);
+            --card-border: rgba(255, 255, 255, 0.12);
             --accent-cyan: #38bdf8;
             --accent-blue: #3b82f6;
             --accent-purple: #818cf8;
@@ -20,7 +20,7 @@
             --accent-red: #ef4444;
             --text-main: #f8fafc;
             --text-muted: #94a3b8;
-            --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.45);
         }
 
         * {
@@ -32,7 +32,9 @@
         }
 
         body {
-            background: var(--bg-gradient);
+            background: 
+                linear-gradient(180deg, rgba(11, 15, 25, 0.82) 0%, rgba(15, 23, 42, 0.92) 100%),
+                url('https://raw.githubusercontent.com/fortheland-crypto/avtomiika/main/carwash_banner.jpg') no-repeat center center / cover;
             color: var(--text-main);
             height: 100vh;
             max-height: 100vh;
@@ -52,6 +54,7 @@
             padding-bottom: 6px;
             border-bottom: 1px solid var(--card-border);
             flex-shrink: 0;
+            backdrop-filter: blur(10px);
         }
 
         .brand-title {
@@ -69,7 +72,7 @@
             align-items: center;
             justify-content: center;
             font-size: 17px;
-            box-shadow: 0 0 16px rgba(59, 130, 246, 0.4);
+            box-shadow: 0 0 16px rgba(59, 130, 246, 0.5);
         }
 
         .brand-text h1 {
@@ -87,9 +90,9 @@
         }
 
         .live-badge {
-            background: rgba(34, 197, 94, 0.15);
+            background: rgba(34, 197, 94, 0.18);
             color: var(--accent-green);
-            border: 1px solid rgba(34, 197, 94, 0.3);
+            border: 1px solid rgba(34, 197, 94, 0.4);
             padding: 3px 8px;
             border-radius: 16px;
             font-size: 10px;
@@ -124,12 +127,13 @@
 
         .kpi-card {
             background: var(--card-bg);
-            backdrop-filter: blur(12px);
+            backdrop-filter: blur(16px);
             border: 1px solid var(--card-border);
             border-radius: 12px;
             padding: 8px 10px;
             position: relative;
             overflow: hidden;
+            box-shadow: var(--glass-shadow);
         }
 
         .kpi-card::before {
@@ -183,7 +187,7 @@
 
         .box-card {
             background: var(--card-bg);
-            backdrop-filter: blur(12px);
+            backdrop-filter: blur(16px);
             border: 1px solid var(--card-border);
             border-radius: 14px;
             padding: 10px;
@@ -195,13 +199,13 @@
         }
 
         .box-card.occupied {
-            border-color: rgba(239, 68, 68, 0.4);
-            background: linear-gradient(145deg, rgba(239, 68, 68, 0.12) 0%, rgba(30, 41, 59, 0.85) 100%);
+            border-color: rgba(239, 68, 68, 0.45);
+            background: linear-gradient(145deg, rgba(239, 68, 68, 0.16) 0%, rgba(15, 23, 42, 0.85) 100%);
         }
 
         .box-card.free {
-            border-color: rgba(34, 197, 94, 0.35);
-            background: linear-gradient(145deg, rgba(34, 197, 94, 0.08) 0%, rgba(30, 41, 59, 0.75) 100%);
+            border-color: rgba(34, 197, 94, 0.4);
+            background: linear-gradient(145deg, rgba(34, 197, 94, 0.12) 0%, rgba(15, 23, 42, 0.8) 100%);
         }
 
         .box-top {
@@ -223,12 +227,12 @@
         }
 
         .box-card.free .box-status-tag {
-            background: rgba(34, 197, 94, 0.2);
+            background: rgba(34, 197, 94, 0.25);
             color: var(--accent-green);
         }
 
         .box-card.occupied .box-status-tag {
-            background: rgba(239, 68, 68, 0.2);
+            background: rgba(239, 68, 68, 0.25);
             color: var(--accent-red);
         }
 
@@ -245,6 +249,7 @@
             padding: 1px 6px;
             border-radius: 5px;
             margin-bottom: 2px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
         }
 
         .service-name {
@@ -285,11 +290,13 @@
         .btn-add {
             background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
             color: #ffffff;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
         }
 
         .btn-finish {
             background: linear-gradient(135deg, #ef4444, #dc2626);
             color: #ffffff;
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
         }
 
         /* Modal Popups */
