@@ -44,12 +44,6 @@ def init_db():
             pass
         conn.commit()
 
-        cursor.execute("SELECT COUNT(*) FROM washes")
-        count = cursor.fetchone()[0]
-
-    if count == 0:
-        generate_demo_shift()
-
 def add_wash_entry(box_name: str, service_key: str, car_number: str = "—") -> int:
     """Фиксация заезда машины с 3-значным номером в бокс по локальному времени UTC+5"""
     if service_key not in SERVICES:
@@ -112,7 +106,6 @@ def get_active_washes():
         for r in rows:
             row_dict = dict(r)
             try:
-                # Отрезаем возможные смещения часового пояса для парсинга
                 clean_time = row_dict["entry_time"].split(".")[0].split("+")[0]
                 entry_dt = datetime.strptime(clean_time, "%Y-%m-%d %H:%M:%S").replace(tzinfo=TZ_OFFSET)
                 duration_seconds = int((now - entry_dt).total_seconds())
@@ -240,18 +233,4 @@ def generate_demo_shift():
                 exit_dt.strftime("%Y-%m-%d %H:%M:%S")
             ))
             
-        # Добавляем 2 активные машины с номерами (№307 и №542) в Бокс №3 и Бокс №4
-        entry_active1 = (now - timedelta(minutes=14)).strftime("%Y-%m-%d %H:%M:%S")
-        entry_active2 = (now - timedelta(minutes=4)).strftime("%Y-%m-%d %H:%M:%S")
-        
-        cursor.execute("""
-            INSERT INTO washes (box_name, service_key, service_name, price, car_number, entry_time, status)
-            VALUES (?, ?, ?, ?, ?, ?, 'in_box')
-        """, ("Бокс №3", "suv", SERVICES["suv"]["title"], SERVICES["suv"]["price"], "307", entry_active1))
-        
-        cursor.execute("""
-            INSERT INTO washes (box_name, service_key, service_name, price, car_number, entry_time, status)
-            VALUES (?, ?, ?, ?, ?, ?, 'in_box')
-        """, ("Бокс №4", "light_complex", SERVICES["light_complex"]["title"], SERVICES["light_complex"]["price"], "542", entry_active2))
-
         conn.commit()
