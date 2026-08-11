@@ -25,6 +25,8 @@ from config import SERVICES, MIN_WASH_DURATION_SECONDS
 
 router = Router()
 
+BANNER_URL = "https://raw.githubusercontent.com/fortheland-crypto/avtomiika/main/carwash_banner.jpg"
+
 class WashForm(StatesGroup):
     waiting_for_car_number = State()
 
@@ -42,7 +44,7 @@ def format_seconds(seconds: int) -> str:
 
 @router.message(CommandStart())
 async def cmd_start(message: Message, state: FSMContext):
-    """Обработчик команды /start"""
+    """Обработчик команды /start с отправкой стильного баннера"""
     await state.clear()
     text = (
         "👋 **Добро пожаловать в Telegram-бот системы автомойки!**\n\n"
@@ -55,7 +57,15 @@ async def cmd_start(message: Message, state: FSMContext):
         "• 🚙✨ **Джип (Комплекс)**: 7 000 ₸\n\n"
         "💡 *Используйте 4 кнопки меню внизу экрана для управления заездами и статистикой.*"
     )
-    await message.answer(text, reply_markup=get_main_keyboard(), parse_mode="Markdown")
+    try:
+        await message.answer_photo(
+            photo=BANNER_URL,
+            caption=text,
+            reply_markup=get_main_keyboard(),
+            parse_mode="Markdown"
+        )
+    except Exception:
+        await message.answer(text, reply_markup=get_main_keyboard(), parse_mode="Markdown")
 
 @router.message(F.text == "🚗 Зафиксировать въезд")
 async def start_entry_process(message: Message, state: FSMContext):
@@ -155,7 +165,6 @@ async def process_car_number_input(message: Message, state: FSMContext):
         f"⏱ **Время въезда**: {now_time} *(UTC+5)*\n\n"
         f"📌 *Нажмите кнопку ниже, когда машина помоется и выедет из бокса!*"
     )
-    # Сохраняем главную reply-клавиатуру 4 кнопок активной!
     await message.answer(text, reply_markup=finish_keyboard, parse_mode="Markdown")
     await message.answer("👇 **Главное меню автомойки:**", reply_markup=get_main_keyboard())
 
@@ -303,10 +312,8 @@ async def finish_wash_callback(callback: CallbackQuery):
         f"🕒 **Время выезда**: **{now_time}** *(UTC+5)*"
     )
     
-    # 1. Показываем всплывающее модальное окно в Telegram
     await callback.answer("🏁 Заявка закрыта! Выезд зафиксирован.", show_alert=True)
     
-    # 2. Обновляем сообщение (редактируем текстом закрытого чека)
     try:
         if callback.message:
             await callback.message.edit_text(text, parse_mode="Markdown", reply_markup=None)
