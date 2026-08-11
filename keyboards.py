@@ -58,7 +58,9 @@ def get_active_washes_keyboard() -> InlineKeyboardMarkup:
     for w in active:
         b_name = w["box_name"]
         price = f"{w['price']:,} ₸".replace(",", " ")
-        btn_text = f"🏁 Выехал: {b_name} ({price})"
+        car_num = w.get("car_number", "—")
+        num_str = f" ({car_num})" if car_num and car_num != "—" else ""
+        btn_text = f"🏁 Выехал: {b_name}{num_str} — {price}"
         inline_keyboard.append([
             InlineKeyboardButton(text=btn_text, callback_data=f"finish_wash:{w['id']}")
         ])

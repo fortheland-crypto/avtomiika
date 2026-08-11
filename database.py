@@ -1,8 +1,15 @@
 import sqlite3
 import os
 import tempfile
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta, date, timezone
 from config import SERVICES, MIN_WASH_DURATION_SECONDS, BOXES
+
+# Локальный часовой пояс автомойки (UTC+5)
+TZ_OFFSET = timezone(timedelta(hours=5))
+
+def get_now() -> datetime:
+    """Текущее время в локальном часовом поясе (UTC+5)"""
+    return datetime.now(timezone.utc).astimezone(TZ_OFFSET)
 
 if os.getenv("VERCEL") or not os.access(os.path.dirname(__file__), os.W_OK):
     DB_PATH = os.path.join(tempfile.gettempdir(), "carwash.db")
@@ -38,7 +45,7 @@ def init_db():
         conn.commit()
 
 def add_wash_entry(box_name: str, service_key: str, car_number: str = "—") -> int:
-    """Фиксация заезда машины с 3-значным номером в бокс"""
+    """Фиксация заезда машины с 3-значным номером в бокс по локальному времени UTC+5"""
     if service_key not in SERVICES:
         raise ValueError("Неизвестная услуга")
     
@@ -48,14 +55,14 @@ def add_wash_entry(box_name: str, service_key: str, car_number: str = "—") -> 
         cursor = conn.cursor()
         
         # Если в боксе уже есть активная машина, завершаем её
-        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        now_str = get_now().strftime("%Y-%m-%d %H:%M:%S")
         cursor.execute("""
             UPDATE washes 
             SET status = 'completed', exit_time = ? 
             WHERE box_name = ? AND status = 'in_box'
         """, (now_str, box_name))
         
-        # Создаём новую запись о заезде с номером авто
+        # Создаём новую запись о заезде с локальным временем
         cursor.execute("""
             INSERT INTO washes (box_name, service_key, service_name, price, car_number, entry_time, status)
             VALUES (?, ?, ?, ?, ?, ?, 'in_box')
@@ -65,10 +72,10 @@ def add_wash_entry(box_name: str, service_key: str, car_number: str = "—") -> 
         return cursor.lastrowid
 
 def complete_wash(wash_id: int) -> bool:
-    """Отметка о выезде машины из бокса (выписка чека)"""
+    """Отметка о выезде машины из бокса (выписка чека) по времени UTC+5"""
     with get_connection() as conn:
         cursor = conn.cursor()
-        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        now_str = get_now().strftime("%Y-%m-%d %H:%M:%S")
         cursor.execute("""
             UPDATE washes
             SET status = 'completed', exit_time = ?
@@ -95,11 +102,13 @@ def get_active_washes():
         rows = cursor.fetchall()
         
         active_list = []
-        now = datetime.now()
+        now = get_now()
         for r in rows:
             row_dict = dict(r)
             try:
-                entry_dt = datetime.strptime(row_dict["entry_time"], "%Y-%m-%d %H:%M:%S")
+                # Отрезаем возможные смещения часового пояса для парсинга
+                clean_time = row_dict["entry_time"].split(".")[0].split("+")[0]
+                entry_dt = datetime.strptime(clean_time, "%Y-%m-%d %H:%M:%S").replace(tzinfo=TZ_OFFSET)
                 duration_seconds = int((now - entry_dt).total_seconds())
             except Exception:
                 duration_seconds = 65
@@ -112,14 +121,14 @@ def get_active_washes():
 
 def get_today_stats():
     """
-    Расчёт статистики автомойки за текущую смену / день.
+    Расчёт статистики автомойки за текущую смену / день с локальной датой UTC+5.
     """
     with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM washes ORDER BY entry_time ASC")
         rows = [dict(r) for r in cursor.fetchall()]
         
-    now = datetime.now()
+    now = get_now()
     
     total_entries = len(rows)
     confirmed_washes = []
@@ -129,7 +138,8 @@ def get_today_stats():
             confirmed_washes.append(r)
         elif r["status"] == "in_box":
             try:
-                entry_dt = datetime.strptime(r["entry_time"], "%Y-%m-%d %H:%M:%S")
+                clean_time = r["entry_time"].split(".")[0].split("+")[0]
+                entry_dt = datetime.strptime(clean_time, "%Y-%m-%d %H:%M:%S").replace(tzinfo=TZ_OFFSET)
                 duration = (now - entry_dt).total_seconds()
                 if duration >= MIN_WASH_DURATION_SECONDS:
                     confirmed_washes.append(r)
@@ -162,7 +172,7 @@ def get_today_stats():
         box_stats[b_name]["sum"] += w["price"]
         
     return {
-        "today_date": date.today().strftime("%d.%m.%Y"),
+        "today_date": get_now().strftime("%d.%m.%Y"),
         "total_entries": total_entries,
         "confirmed_count": confirmed_count,
         "total_revenue": total_revenue,
@@ -174,13 +184,13 @@ def get_today_stats():
 
 def generate_demo_shift():
     """
-    Генерация наглядной демо-смены с 3-значными номерами авто.
+    Генерация смены по локальному времени (UTC+5) с 3-значными номерами.
     """
     with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("DELETE FROM washes")
         
-        now = datetime.now()
+        now = get_now()
         
         demo_offsets = [
             ("Бокс №1", "light", "542", 360, 20),

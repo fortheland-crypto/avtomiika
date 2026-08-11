@@ -17,7 +17,9 @@ from database import (
     get_active_washes,
     get_today_stats,
     generate_demo_shift,
-    get_wash_by_id
+    get_wash_by_id,
+    get_now,
+    TZ_OFFSET
 )
 from config import SERVICES, MIN_WASH_DURATION_SECONDS
 
@@ -93,7 +95,6 @@ async def add_wash_callback(callback: CallbackQuery, state: FSMContext):
     service_key = parts[2]
     service_info = SERVICES[service_key]
     
-    # Сохраняем данные во временном состоянии FSM
     await state.update_data(box_name=box_name, service_key=service_key)
     await state.set_state(WashForm.waiting_for_car_number)
     
@@ -127,20 +128,25 @@ async def process_car_number_input(message: Message, state: FSMContext):
     service_info = SERVICES[service_key]
     formatted_num = f"№{car_num_raw}" if car_num_raw else "—"
     
-    add_wash_entry(box_name, service_key, car_number=formatted_num)
+    wash_id = add_wash_entry(box_name, service_key, car_number=formatted_num)
     await state.clear()
     
-    now_time = datetime.now().strftime("%H:%M:%S")
+    now_time = get_now().strftime("%H:%M:%S")
+    
+    finish_keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=f"🏁 Оформить выезд ({formatted_num})", callback_data=f"finish_wash:{wash_id}")]
+    ])
+    
     text = (
         f"✅ **Въезд зафиксирован!**\n\n"
         f"📍 **Бокс**: {box_name}\n"
         f"🔢 **Номер авто**: **{formatted_num}**\n"
         f"🚗 **Категория**: {service_info['title']}\n"
         f"🧾 **Чек**: **{format_currency(service_info['price'])}**\n"
-        f"⏱ **Время въезда**: {now_time}\n\n"
-        f"📌 *Автомобиль учитывается в статистике при нахождении в боксе >1 минуты.*"
+        f"⏱ **Время въезда**: {now_time} *(UTC+5)*\n\n"
+        f"📌 *Нажмите кнопку ниже, когда машина помоется и выедет из бокса!*"
     )
-    await message.answer(text, reply_markup=get_main_keyboard(), parse_mode="Markdown")
+    await message.answer(text, reply_markup=finish_keyboard, parse_mode="Markdown")
 
 @router.callback_query(F.data == "skip_car_number")
 async def skip_car_number_callback(callback: CallbackQuery, state: FSMContext):
@@ -155,20 +161,25 @@ async def skip_car_number_callback(callback: CallbackQuery, state: FSMContext):
         return
 
     service_info = SERVICES[service_key]
-    add_wash_entry(box_name, service_key, car_number="—")
+    wash_id = add_wash_entry(box_name, service_key, car_number="—")
     await state.clear()
     
-    now_time = datetime.now().strftime("%H:%M:%S")
+    now_time = get_now().strftime("%H:%M:%S")
+    
+    finish_keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=f"🏁 Оформить выезд ({box_name})", callback_data=f"finish_wash:{wash_id}")]
+    ])
+    
     text = (
         f"✅ **Въезд зафиксирован!**\n\n"
         f"📍 **Бокс**: {box_name}\n"
         f"🔢 **Номер авто**: **—**\n"
         f"🚗 **Категория**: {service_info['title']}\n"
         f"🧾 **Чек**: **{format_currency(service_info['price'])}**\n"
-        f"⏱ **Время въезда**: {now_time}\n\n"
-        f"📌 *Автомобиль учитывается в статистике при нахождении в боксе >1 минуты.*"
+        f"⏱ **Время въезда**: {now_time} *(UTC+5)*\n\n"
+        f"📌 *Нажмите кнопку ниже, когда машина помоется и выедет из бокса!*"
     )
-    await callback.message.edit_text(text, parse_mode="Markdown")
+    await callback.message.edit_text(text, reply_markup=finish_keyboard, parse_mode="Markdown")
     await callback.answer("Заезд успешно зафиксирован!")
 
 @router.message(F.text == "⏱ Машины в боксах")
@@ -237,7 +248,7 @@ async def refresh_active_callback(callback: CallbackQuery):
 
 @router.callback_query(F.data.startswith("finish_wash:"))
 async def finish_wash_callback(callback: CallbackQuery):
-    """Отметка о выезде машины из бокса и закрытие чека"""
+    """Отметка о выезде машины из бокса и закрытие чека по времени UTC+5"""
     wash_id = int(callback.data.split(":")[1])
     wash_data = get_wash_by_id(wash_id)
     
@@ -248,29 +259,34 @@ async def finish_wash_callback(callback: CallbackQuery):
     completed = complete_wash(wash_id)
     
     if completed:
-        now_time = datetime.now().strftime("%H:%M:%S")
+        now = get_now()
+        now_time = now.strftime("%H:%M:%S")
         try:
-            entry_dt = datetime.strptime(wash_data["entry_time"], "%Y-%m-%d %H:%M:%S")
-            total_seconds = int((datetime.now() - entry_dt).total_seconds())
+            clean_time = wash_data["entry_time"].split(".")[0].split("+")[0]
+            entry_dt = datetime.strptime(clean_time, "%Y-%m-%d %H:%M:%S").replace(tzinfo=TZ_OFFSET)
+            total_seconds = int((now - entry_dt).total_seconds())
             dur_str = format_seconds(total_seconds)
         except Exception:
             dur_str = "15 мин"
             
-        num_str = f" ({wash_data['car_number']})" if wash_data.get('car_number') and wash_data.get('car_number') != '—' else ""
+        car_num = wash_data.get('car_number', '—')
         
         text = (
-            f"🧾 **ЧЕК ЗАКРЫТ (ВЫЕЗД)**\n\n"
+            f"🧾 **ЧЕК ЗАКРЫТ (ВЫЕЗД ИЗ БОКСА)**\n\n"
             f"📍 **Бокс**: {wash_data['box_name']}\n"
-            f"🔢 **Номер авто**: **{wash_data.get('car_number', '—')}**\n"
+            f"🔢 **Номер авто**: **{car_num}**\n"
             f"🚗 **Категория**: {wash_data['service_name']}\n"
             f"💰 **К оплате**: **{format_currency(wash_data['price'])}**\n"
-            f"⏱ **Общее время в боксе**: {dur_str}\n"
-            f"🕒 **Время выезда**: {now_time}"
+            f"⏱ **Общее время в боксе**: **{dur_str}**\n"
+            f"🕒 **Время выезда**: **{now_time}** *(UTC+5)*"
         )
         await callback.message.answer(text, parse_mode="Markdown")
-        await callback.answer("Бокс освобождён! Чек закрыт.")
+        await callback.answer("🏁 Выезд зафиксирован! Чек закрыт.")
         
-        await refresh_active_callback(callback)
+        try:
+            await callback.message.delete_reply_markup()
+        except Exception:
+            pass
     else:
         await callback.answer("Машина уже выехала из бокса.")
 
@@ -333,8 +349,8 @@ async def setup_demo_shift(message: Message, state: FSMContext):
     
     text_notice = (
         "⚡ **Демо-смена успешно сгенерирована!**\n\n"
-        "В базу добавлено 14 прошедших заездов авто за сегодня с 3-значными номерами "
-        "(например: №542, №109, №777) + 2 активные машины (№307 и №542) в Боксе №3 и Боксе №4!\n\n"
+        "В базу добавлено 14 прошедших заездов авто за сегодня по локальному времени (UTC+5) "
+        "с 3-значными номерами (например: №542, №109, №777) + 2 активные машины (№307 и №542) в Боксе №3 и Боксе №4!\n\n"
         "Ниже сформирован готовый аналитический отчёт:"
     )
     await message.answer(text_notice, parse_mode="Markdown")
