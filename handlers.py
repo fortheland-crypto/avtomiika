@@ -45,20 +45,34 @@ def format_seconds(seconds: int) -> str:
         return f"{mins} мин {secs} сек"
     return f"{secs} сек"
 
+async def safe_update_message(callback: CallbackQuery, text: str, reply_markup=None):
+    """Безопасное обновление текста сообщения или подписи к фото"""
+    try:
+        if callback.message:
+            if callback.message.photo:
+                await callback.message.edit_caption(caption=text, reply_markup=reply_markup, parse_mode="Markdown")
+            else:
+                await callback.message.edit_text(text=text, reply_markup=reply_markup, parse_mode="Markdown")
+    except Exception:
+        try:
+            await callback.message.answer(text, reply_markup=reply_markup, parse_mode="Markdown")
+        except Exception:
+            pass
+
 @router.message(CommandStart())
 async def cmd_start(message: Message, state: FSMContext):
     """Обработчик команды /start с отправкой стильного баннера"""
     await state.clear()
     text = (
         "👋 **Добро пожаловать в Telegram-бот системы автомойки!**\n\n"
-        "Данный бот фиксирует въезд машин с 3-значным номером по боксам, ведёт автоматический подсчёт "
+        "Данный бот фиксирует въезд и выезд машин по боксам, ведёт автоматический подсчёт "
         "вымытых автомобилей и рассчитывает выручку по прейскуранту (в ₸).\n\n"
         "📌 **Прейскурант:**\n"
         "• 🚗 **Легковая машина**: 3 000 ₸\n"
         "• 🚙 **Джип / Большая машина**: 5 000 ₸\n"
         "• 🚗✨ **Легковая (Комплекс)**: 4 500 ₸\n"
         "• 🚙✨ **Джип (Комплекс)**: 7 000 ₸\n\n"
-        "💡 *Используйте 4 кнопки меню внизу экрана для управления заездами и статистикой.*"
+        "💡 *Используйте 4 главные кнопки ниже для управления въездами, выездами и отчётами.*"
     )
     start_inline_kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="📱 Открыть Графический Дашборд", web_app=WebAppInfo(url="https://avtomiika.vercel.app/dashboard"))]
@@ -76,31 +90,60 @@ async def cmd_start(message: Message, state: FSMContext):
 
 @router.message(F.text == "🚗 Зафиксировать въезд")
 async def start_entry_process(message: Message, state: FSMContext):
-    """Начало фиксации заезда: выбор бокса"""
+    """Начало фиксации заезда: выбор свободного бокса"""
     await state.clear()
-    text = "🚗 **Выберите свободный бокс для заезда или занятый бокс для выезда:**"
+    text = "🚗 **Выберите свободный бокс для заезда автомобиля:**"
     await message.answer(text, reply_markup=get_boxes_inline_keyboard(), parse_mode="Markdown")
+
+@router.message(F.text == "🏁 Зафиксировать выезд")
+@router.message(F.text == "⏱ Машины в боксах")
+async def start_exit_process(message: Message, state: FSMContext):
+    """Фиксация выезда машины из бокса и закрытие чека"""
+    await state.clear()
+    active = get_active_washes()
+    
+    if not active:
+        await message.answer(
+            "🟢 **В данный момент все боксы свободны.**\nНет машин, ожидающих выезда.",
+            reply_markup=get_main_keyboard(),
+            parse_mode="Markdown"
+        )
+        return
+
+    text_lines = ["🏁 **МАШИНЫ В БОКСАХ (ВЫБЕРИТЕ ДЛЯ ВЫЕЗДА):**\n"]
+    for w in active:
+        duration_str = format_seconds(w["duration_seconds"])
+        num_str = f" (**{w.get('car_number', '—')}**)" if w.get('car_number') and w.get('car_number') != '—' else ""
+        
+        text_lines.append(
+            f"🔴 **{w['box_name']}**{num_str}: {w['service_name']}\n"
+            f"   🧾 Чек: {format_currency(w['price'])}\n"
+            f"   ⏱ В боксе: **{duration_str}**\n"
+        )
+        
+    await message.answer(
+        "\n".join(text_lines),
+        reply_markup=get_active_washes_keyboard(),
+        parse_mode="Markdown"
+    )
 
 @router.callback_query(F.data == "back_to_boxes")
 async def back_to_boxes_callback(callback: CallbackQuery, state: FSMContext):
     """Возврат к выбору бокса"""
     await state.clear()
-    text = "🚗 **Выберите свободный бокс для заезда или занятый бокс для выезда:**"
-    try:
-        await callback.message.edit_text(text, reply_markup=get_boxes_inline_keyboard(), parse_mode="Markdown")
-    except TelegramBadRequest:
-        pass
+    text = "🚗 **Выберите свободный бокс для заезда автомобиля:**"
+    await safe_update_message(callback, text, get_boxes_inline_keyboard())
     await callback.answer()
 
 @router.callback_query(F.data.startswith("select_box:"))
 async def select_box_callback(callback: CallbackQuery):
-    """Выбор бокса: показ занятости или прейскуранта категорий авто"""
+    """Выбор бокса: показ карточки стоящей машины или прейскуранта услуг"""
     box_name = callback.data.split(":")[1]
     active_washes = get_active_washes()
     occupied_map = {w["box_name"]: w for w in active_washes}
     
     if box_name in occupied_map:
-        # Бокс ЗАНЯТ: Показываем карточку машины в боксе и кнопку выезда
+        # Если бокс занят, показываем карточку и кнопку моментального выезда
         w = occupied_map[box_name]
         now = get_now()
         try:
@@ -118,34 +161,24 @@ async def select_box_callback(callback: CallbackQuery):
             f"🚗 **Категория**: {w['service_name']}\n"
             f"💰 **К оплате**: **{format_currency(w['price'])}**\n"
             f"⏱ **Время в боксе**: **{dur_str}**\n\n"
-            f"📌 *Вы можете оформить выезд этой машины ниже:*"
+            f"📌 *Нажмите кнопку ниже, чтобы зафиксировать выезд:* "
         )
         
         kb = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text=f"🏁 Оформить выезд ({car_num})", callback_data=f"ask_finish_wash:{w['id']}")],
+            [InlineKeyboardButton(text=f"🏁 Зафиксировать выезд ({car_num})", callback_data=f"direct_finish_wash:{w['id']}")],
             [InlineKeyboardButton(text="⬅️ К выбору боксов", callback_data="back_to_boxes"), InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_action")]
         ])
         
-        try:
-            await callback.message.edit_text(text, reply_markup=kb, parse_mode="Markdown")
-        except TelegramBadRequest:
-            pass
+        await safe_update_message(callback, text, kb)
         await callback.answer()
         return
 
-    # Бокс СВОБОДЕН — показываем выбор услуг по прейскуранту
+    # Если бокс свободен — показываем прейскурант услуг
     text = (
         f"🟢 **{box_name} (Свободен)**\n\n"
         f"Укажите категорию автомобиля или услугу по прейскуранту:"
     )
-    try:
-        await callback.message.edit_text(
-            text, 
-            reply_markup=get_services_inline_keyboard(box_name),
-            parse_mode="Markdown"
-        )
-    except TelegramBadRequest:
-        pass
+    await safe_update_message(callback, text, get_services_inline_keyboard(box_name))
     await callback.answer()
 
 @router.callback_query(F.data.startswith("add_wash:"))
@@ -169,10 +202,7 @@ async def add_wash_callback(callback: CallbackQuery, state: FSMContext):
         f"🔢 **Введите 3-значный номер автомобиля:**\n"
         f"*(Например, отправьте в чат: `542` или `123`)*"
     )
-    try:
-        await callback.message.edit_text(text, reply_markup=keyboard, parse_mode="Markdown")
-    except TelegramBadRequest:
-        pass
+    await safe_update_message(callback, text, keyboard)
     await callback.answer()
 
 @router.message(WashForm.waiting_for_car_number)
@@ -198,7 +228,7 @@ async def process_car_number_input(message: Message, state: FSMContext):
     now_time = get_now().strftime("%H:%M:%S")
     
     finish_keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text=f"🏁 Оформить выезд ({formatted_num})", callback_data=f"ask_finish_wash:{wash_id}")]
+        [InlineKeyboardButton(text=f"🏁 Оформить выезд ({formatted_num})", callback_data=f"direct_finish_wash:{wash_id}")]
     ])
     
     text = (
@@ -232,7 +262,7 @@ async def skip_car_number_callback(callback: CallbackQuery, state: FSMContext):
     now_time = get_now().strftime("%H:%M:%S")
     
     finish_keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text=f"🏁 Оформить выезд ({box_name})", callback_data=f"ask_finish_wash:{wash_id}")]
+        [InlineKeyboardButton(text=f"🏁 Оформить выезд ({box_name})", callback_data=f"direct_finish_wash:{wash_id}")]
     ])
     
     text = (
@@ -244,45 +274,9 @@ async def skip_car_number_callback(callback: CallbackQuery, state: FSMContext):
         f"⏱ **Время въезда**: {now_time} *(UTC+5)*\n\n"
         f"📌 *Нажмите кнопку ниже, когда машина помоется и выедет из бокса!*"
     )
-    try:
-        await callback.message.edit_text(text, reply_markup=finish_keyboard, parse_mode="Markdown")
-    except TelegramBadRequest:
-        await callback.message.answer(text, reply_markup=finish_keyboard, parse_mode="Markdown")
-        
+    await safe_update_message(callback, text, finish_keyboard)
     await callback.answer("Заезд успешно зафиксирован!")
     await callback.message.answer("👇 **Главное меню автомойки:**", reply_markup=get_main_keyboard())
-
-@router.message(F.text == "⏱ Машины в боксах")
-async def show_active_washes(message: Message, state: FSMContext):
-    """Просмотр машин, находящихся в боксах в данный момент"""
-    await state.clear()
-    active = get_active_washes()
-    
-    if not active:
-        await message.answer(
-            "🟢 **В данный момент все боксы свободны.**",
-            reply_markup=get_main_keyboard(),
-            parse_mode="Markdown"
-        )
-        return
-
-    text_lines = ["⏱ **МАШИНЫ В БОКСАХ ПРЯМО СЕЙЧАС:**\n"]
-    for w in active:
-        duration_str = format_seconds(w["duration_seconds"])
-        status_icon = "✅ Подтверждена" if w["is_qualified"] else "⏳ Ожидание (>1 мин)"
-        num_str = f" (**{w.get('car_number', '—')}**)" if w.get('car_number') and w.get('car_number') != '—' else ""
-        
-        text_lines.append(
-            f"🔴 **{w['box_name']}**{num_str}: {w['service_name']}\n"
-            f"   🧾 Чек: {format_currency(w['price'])}\n"
-            f"   ⏱ В боксе: **{duration_str}** ({status_icon})\n"
-        )
-        
-    await message.answer(
-        "\n".join(text_lines),
-        reply_markup=get_active_washes_keyboard(),
-        parse_mode="Markdown"
-    )
 
 @router.callback_query(F.data == "refresh_active")
 async def refresh_active_callback(callback: CallbackQuery):
@@ -290,42 +284,27 @@ async def refresh_active_callback(callback: CallbackQuery):
     active = get_active_washes()
     
     if not active:
-        try:
-            await callback.message.edit_text(
-                "🟢 **В данный момент все боксы свободны.**",
-                parse_mode="Markdown"
-            )
-        except TelegramBadRequest:
-            pass
+        await safe_update_message(callback, "🟢 **В данный момент все боксы свободны.**")
         await callback.answer("🟢 Все боксы свободны!", show_alert=True)
         return
 
-    text_lines = ["⏱ **МАШИНЫ В БОКСАХ ПРЯМО СЕЙЧАС:**\n"]
+    text_lines = ["🏁 **МАШИНЫ В БОКСАХ (ВЫБЕРИТЕ ДЛЯ ВЫЕЗДА):**\n"]
     for w in active:
         duration_str = format_seconds(w["duration_seconds"])
-        status_icon = "✅ Подтверждена" if w["is_qualified"] else "⏳ Ожидание (>1 мин)"
         num_str = f" (**{w.get('car_number', '—')}**)" if w.get('car_number') and w.get('car_number') != '—' else ""
         
         text_lines.append(
             f"🔴 **{w['box_name']}**{num_str}: {w['service_name']}\n"
             f"   🧾 Чек: {format_currency(w['price'])}\n"
-            f"   ⏱ В боксе: **{duration_str}** ({status_icon})\n"
+            f"   ⏱ В боксе: **{duration_str}**\n"
         )
         
-    try:
-        await callback.message.edit_text(
-            "\n".join(text_lines),
-            reply_markup=get_active_washes_keyboard(),
-            parse_mode="Markdown"
-        )
-    except TelegramBadRequest:
-        pass
-        
+    await safe_update_message(callback, "\n".join(text_lines), get_active_washes_keyboard())
     await callback.answer("🔄 Список обновлён!", show_alert=True)
 
-@router.callback_query(F.data.startswith("ask_finish_wash:") | F.data.startswith("finish_wash:"))
-async def ask_finish_wash_callback(callback: CallbackQuery):
-    """Запрос подтверждения выезда машины из бокса с визуальной карточкой"""
+@router.callback_query(F.data.startswith("direct_finish_wash:") | F.data.startswith("finish_wash:"))
+async def direct_finish_wash_callback(callback: CallbackQuery):
+    """Прямое оформление выезда авто из бокса со 100% надёжностью"""
     wash_id = int(callback.data.split(":")[1])
     wash_data = get_wash_by_id(wash_id)
     
@@ -333,41 +312,6 @@ async def ask_finish_wash_callback(callback: CallbackQuery):
         await callback.answer("⚠️ Заявка уже была закрыта ранее.", show_alert=True)
         return
 
-    car_num = wash_data.get('car_number', '—')
-    text = (
-        f"⚠️ **ПОДТВЕРЖДЕНИЕ ВЫЕЗДА ИЗ БОКСА**\n\n"
-        f"📍 **Бокс**: {wash_data['box_name']}\n"
-        f"🔢 **Номер авто**: **{car_num}**\n"
-        f"🚗 **Категория**: {wash_data['service_name']}\n"
-        f"💰 **Сумма к оплате**: **{format_currency(wash_data['price'])}**\n\n"
-        f"❓ **Вы действительно хотите выписать чек и завершить мойку?**"
-    )
-    
-    confirm_kb = InlineKeyboardMarkup(inline_keyboard=[
-        [
-            InlineKeyboardButton(text=f"✅ Да, выехать ({car_num})", callback_data=f"confirm_finish_wash:{wash_id}")
-        ],
-        [
-            InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_action")
-        ]
-    ])
-    
-    try:
-        await callback.message.edit_text(text, reply_markup=confirm_kb, parse_mode="Markdown")
-    except TelegramBadRequest:
-        await callback.message.answer(text, reply_markup=confirm_kb, parse_mode="Markdown")
-    await callback.answer()
-
-@router.callback_query(F.data.startswith("confirm_finish_wash:"))
-async def confirm_finish_wash_callback(callback: CallbackQuery):
-    """Оформление выезда авто из бокса после подтверждения"""
-    wash_id = int(callback.data.split(":")[1])
-    wash_data = get_wash_by_id(wash_id)
-    
-    if not wash_data or wash_data["status"] == "completed":
-        await callback.answer("⚠️ Заявка уже была закрыта.", show_alert=True)
-        return
-        
     complete_wash(wash_id)
     
     now = get_now()
@@ -392,14 +336,11 @@ async def confirm_finish_wash_callback(callback: CallbackQuery):
         f"🕒 **Время выезда**: **{now_time}** *(UTC+5)*"
     )
     
+    # 1. Показываем всплывающее модальное окно Telegram!
     await callback.answer("🏁 Выезд зафиксирован! Чек закрыт.", show_alert=True)
     
-    try:
-        if callback.message:
-            await callback.message.edit_text(text, parse_mode="Markdown", reply_markup=None)
-    except TelegramBadRequest:
-        await callback.message.answer(text, parse_mode="Markdown")
-        
+    # 2. Обновляем сообщение (редактируем текстом закрытого чека)
+    await safe_update_message(callback, text, reply_markup=None)
     await callback.message.answer("👇 **Главное меню автомойки:**", reply_markup=get_main_keyboard())
 
 @router.message(F.text == "📊 Статистика за сегодня")
@@ -459,10 +400,7 @@ async def ask_clear_shift_callback(callback: CallbackQuery):
         "⚠️ **ВЫ УВЕРЕНЫ, ЧТО ХОТИТЕ ОЧИСТИТЬ ЖУРНАЛ СМЕНЫ?**\n\n"
         "При подтверждении все данные заездов и статистика за сегодняшний день будут безвозвратно сброшены."
     )
-    try:
-        await callback.message.edit_text(text, reply_markup=get_confirm_clear_keyboard(), parse_mode="Markdown")
-    except TelegramBadRequest:
-        await callback.message.answer(text, reply_markup=get_confirm_clear_keyboard(), parse_mode="Markdown")
+    await safe_update_message(callback, text, get_confirm_clear_keyboard())
     await callback.answer()
 
 @router.callback_query(F.data == "confirm_clear_shift")
@@ -471,10 +409,7 @@ async def confirm_clear_shift_callback(callback: CallbackQuery):
     clear_shift_history()
     await callback.answer("🗑 Журнал смены и статистика за сегодня очищены!", show_alert=True)
     text = "🗑 **Журнал смены очищен.**\nВсе записи заездов и статистика за сегодня успешно сброшены."
-    try:
-        await callback.message.edit_text(text, reply_markup=None, parse_mode="Markdown")
-    except TelegramBadRequest:
-        await callback.message.answer(text, parse_mode="Markdown")
+    await safe_update_message(callback, text, reply_markup=None)
     await callback.message.answer("👇 **Главное меню автомойки:**", reply_markup=get_main_keyboard())
 
 @router.callback_query(F.data == "cancel_action")
@@ -483,6 +418,6 @@ async def cancel_action_callback(callback: CallbackQuery, state: FSMContext):
     await state.clear()
     try:
         await callback.message.delete()
-    except TelegramBadRequest:
+    except Exception:
         pass
     await callback.answer("Действие отменено")

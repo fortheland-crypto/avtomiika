@@ -5,15 +5,15 @@ from database import get_active_washes
 DASHBOARD_URL = "https://avtomiika.vercel.app/dashboard"
 
 def get_main_keyboard() -> ReplyKeyboardMarkup:
-    """Главная клавиатура бота (ровно 4 чистые кнопки)"""
+    """Главная клавиатура бота: 4 чистые понятные кнопки"""
     kb = [
-        [KeyboardButton(text="🚗 Зафиксировать въезд"), KeyboardButton(text="⏱ Машины в боксах")],
+        [KeyboardButton(text="🚗 Зафиксировать въезд"), KeyboardButton(text="🏁 Зафиксировать выезд")],
         [KeyboardButton(text="📊 Статистика за сегодня"), KeyboardButton(text="📋 Журнал смены")]
     ]
     return ReplyKeyboardMarkup(keyboard=kb, resize_keyboard=True)
 
 def get_boxes_inline_keyboard() -> InlineKeyboardMarkup:
-    """Инлайн клавиатура выбора боксов с информацией о занятости и номерах авто"""
+    """Инлайн клавиатура выбора боксов с отметкой занятости"""
     active_washes = get_active_washes()
     occupied_boxes = {w["box_name"]: w for w in active_washes}
     
@@ -23,9 +23,9 @@ def get_boxes_inline_keyboard() -> InlineKeyboardMarkup:
             w = occupied_boxes[box]
             car_num = w.get("car_number", "—")
             num_str = f" ({car_num})" if car_num and car_num != "—" else ""
-            status_str = f"🔴 {box}{num_str} — Занят"
+            status_str = f"🔴 {box}{num_str} (Занят)"
         else:
-            status_str = f"🟢 {box} — Свободен"
+            status_str = f"🟢 {box} (Свободен)"
             
         inline_keyboard.append([
             InlineKeyboardButton(text=status_str, callback_data=f"select_box:{box}")
@@ -55,7 +55,7 @@ def get_services_inline_keyboard(box_name: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=inline_keyboard)
 
 def get_active_washes_keyboard() -> InlineKeyboardMarkup:
-    """Клавиатура для отметки завершения мойки / выписки чека из списка активных"""
+    """Клавиатура прямого оформления выезда из занятых боксов"""
     active = get_active_washes()
     inline_keyboard = [
         [InlineKeyboardButton(text="📱 Открыть Графический Дашборд", web_app=WebAppInfo(url=DASHBOARD_URL))]
@@ -68,11 +68,11 @@ def get_active_washes_keyboard() -> InlineKeyboardMarkup:
         num_str = f" ({car_num})" if car_num and car_num != "—" else ""
         btn_text = f"🏁 Выехал: {b_name}{num_str} — {price}"
         inline_keyboard.append([
-            InlineKeyboardButton(text=btn_text, callback_data=f"ask_finish_wash:{w['id']}")
+            InlineKeyboardButton(text=btn_text, callback_data=f"direct_finish_wash:{w['id']}")
         ])
         
     inline_keyboard.append([
-        InlineKeyboardButton(text="🔄 Обновить статус", callback_data="refresh_active"),
+        InlineKeyboardButton(text="🔄 Обновить список боксов", callback_data="refresh_active"),
         InlineKeyboardButton(text="❌ Закрыть", callback_data="cancel_action")
     ])
     
