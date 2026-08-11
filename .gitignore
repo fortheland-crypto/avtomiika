@@ -1,0 +1,23 @@
+# Виртуальное окружение Python
+venv/
+ENV/
+env/
+
+# Переменные окружения и секреты
+.env
+
+# База данных SQLite (создается автоматически)
+*.db
+carwash.db
+
+# Кэш Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Операционная система
+.DS_Store
+Thumbs.db
+
+# Vercel
+.vercel/
