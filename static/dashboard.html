@@ -522,7 +522,7 @@
         </div>
     </div>
 
-    <!-- Confirm Finish Modal (Replaces browser confirm dialog) -->
+    <!-- Confirm Finish Modal -->
     <div class="modal-overlay" id="finish-modal">
         <div class="modal-body">
             <div class="modal-title" style="margin-bottom: 12px;">🏁 Подтвердите выезд из бокса</div>
@@ -576,11 +576,18 @@
 
         function renderBoxes() {
             const container = document.getElementById('boxes-container');
-            container.innerHTML = '';
 
             BOXES.forEach(box => {
                 const activeWash = activeWashesMap[box];
-                const card = document.createElement('div');
+                const boxIdStr = box.replace(/[^a-zA-Z0-9]/g, '');
+                let card = document.getElementById(`box-card-${boxIdStr}`);
+
+                if (!card) {
+                    card = document.createElement('div');
+                    card.id = `box-card-${boxIdStr}`;
+                    container.appendChild(card);
+                }
+
                 card.className = `box-card ${activeWash ? 'occupied' : 'free'}`;
 
                 if (activeWash) {
@@ -597,7 +604,7 @@
                         <div class="box-content">
                             <div class="car-num-badge">${activeWash.car_number || '—'}</div>
                             <div class="service-name">${activeWash.service_name}</div>
-                            <div class="timer-display">⏱ ${timerStr}</div>
+                            <div class="timer-display" id="timer-${boxIdStr}">⏱ ${timerStr}</div>
                         </div>
                         <button class="btn-action btn-finish" onclick="openFinishModal(${activeWash.id}, '${box}', '${activeWash.car_number || '—'}')">
                             🏁 Оформить выезд
@@ -617,8 +624,6 @@
                         </button>
                     `;
                 }
-
-                container.appendChild(card);
             });
         }
 
@@ -651,7 +656,7 @@
             const formattedNum = carNumRaw ? `№${carNumRaw}` : '—';
 
             try {
-                const res = await fetch('/api/add_wash', {
+                await fetch('/api/add_wash', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -678,20 +683,23 @@
         }
 
         function closeFinishModal() {
+            targetWashIdToFinish = null;
             document.getElementById('finish-modal').classList.remove('active');
         }
 
         async function submitCompleteWash() {
-            if (!targetWashIdToFinish) return;
+            const washId = targetWashIdToFinish;
+            if (!washId) return;
+            targetWashIdToFinish = null;
+            closeFinishModal();
 
             try {
                 await fetch('/api/complete_wash', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ wash_id: targetWashIdToFinish })
+                    body: JSON.stringify({ wash_id: washId })
                 });
 
-                closeFinishModal();
                 showToast("🏁 Выезд зафиксирован! Чек закрыт.");
                 if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
                 fetchDashboardData();
@@ -700,12 +708,18 @@
             }
         }
 
-        // Increment timers locally
+        // Increment timers in-place on existing DOM elements
         setInterval(() => {
             Object.values(activeWashesMap).forEach(w => {
                 w.duration_seconds = (w.duration_seconds || 0) + 1;
+                const boxIdStr = w.box_name.replace(/[^a-zA-Z0-9]/g, '');
+                const timerElem = document.getElementById(`timer-${boxIdStr}`);
+                if (timerElem) {
+                    const mins = Math.floor(w.duration_seconds / 60);
+                    const secs = w.duration_seconds % 60;
+                    timerElem.innerText = `⏱ ${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+                }
             });
-            renderBoxes();
         }, 1000);
 
         fetchDashboardData();
