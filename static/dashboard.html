@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Дашборд Автомойки</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-gradient: linear-gradient(135deg, #0b0f19 0%, #111827 50%, #0f172a 100%);
+            --card-bg: rgba(30, 41, 59, 0.65);
+            --card-border: rgba(255, 255, 255, 0.08);
+            --accent-cyan: #38bdf8;
+            --accent-blue: #3b82f6;
+            --accent-purple: #818cf8;
+            --accent-green: #22c55e;
+            --accent-red: #ef4444;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Outfit', 'Inter', -apple-system, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background: var(--bg-gradient);
+            color: var(--text-main);
+            min-height: 100vh;
+            padding: 16px;
+            overflow-x: hidden;
+        }
+
+        /* Header Header Styling */
+        .app-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--card-border);
+        }
+
+        .brand-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .brand-icon {
+            width: 42px;
+            height: 42px;
+            background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.4);
+        }
+
+        .brand-text h1 {
+            font-size: 20px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            background: linear-gradient(to right, #ffffff, var(--accent-cyan));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .brand-text p {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .live-badge {
+            background: rgba(34, 197, 94, 0.15);
+            color: var(--accent-green);
+            border: 1px solid rgba(34, 197, 94, 0.3);
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .live-dot {
+            width: 8px;
+            height: 8px;
+            background-color: var(--accent-green);
+            border-radius: 50%;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 8px rgba(34, 197, 94, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+        }
+
+        /* KPI Stat Cards */
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        .kpi-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            padding: 16px;
+            box-shadow: var(--glass-shadow);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .kpi-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background: linear-gradient(90deg, var(--accent-blue), var(--accent-cyan));
+        }
+
+        .kpi-title {
+            font-size: 12px;
+            color: var(--text-muted);
+            font-weight: 500;
+            margin-bottom: 6px;
+        }
+
+        .kpi-value {
+            font-size: 22px;
+            font-weight: 800;
+            color: #ffffff;
+        }
+
+        .kpi-sub {
+            font-size: 11px;
+            color: var(--accent-cyan);
+            margin-top: 4px;
+        }
+
+        /* Boxes Section Header */
+        .section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 14px;
+        }
+
+        .section-title {
+            font-size: 16px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* Boxes Grid */
+        .boxes-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        .box-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--card-border);
+            border-radius: 18px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            min-height: 170px;
+            transition: all 0.25s ease;
+            box-shadow: var(--glass-shadow);
+            position: relative;
+        }
+
+        .box-card.occupied {
+            border-color: rgba(239, 68, 68, 0.4);
+            background: linear-gradient(145deg, rgba(239, 68, 68, 0.08) 0%, rgba(30, 41, 59, 0.8) 100%);
+        }
+
+        .box-card.free {
+            border-color: rgba(34, 197, 94, 0.3);
+            background: linear-gradient(145deg, rgba(34, 197, 94, 0.05) 0%, rgba(30, 41, 59, 0.7) 100%);
+        }
+
+        .box-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .box-name {
+            font-size: 15px;
+            font-weight: 700;
+        }
+
+        .box-status-tag {
+            font-size: 10px;
+            font-weight: 700;
+            padding: 3px 8px;
+            border-radius: 12px;
+            text-transform: uppercase;
+        }
+
+        .box-card.free .box-status-tag {
+            background: rgba(34, 197, 94, 0.2);
+            color: var(--accent-green);
+        }
+
+        .box-card.occupied .box-status-tag {
+            background: rgba(239, 68, 68, 0.2);
+            color: var(--accent-red);
+        }
+
+        .box-content {
+            margin: 12px 0;
+        }
+
+        .car-num-badge {
+            display: inline-block;
+            background: #ffffff;
+            color: #0f172a;
+            font-size: 16px;
+            font-weight: 800;
+            padding: 2px 8px;
+            border-radius: 6px;
+            margin-bottom: 6px;
+            letter-spacing: 0.5px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .service-name {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .timer-display {
+            font-size: 18px;
+            font-weight: 800;
+            color: var(--accent-cyan);
+            font-family: monospace;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .btn-action {
+            width: 100%;
+            padding: 10px;
+            border-radius: 12px;
+            border: none;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: transform 0.15s ease, opacity 0.15s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        .btn-action:active {
+            transform: scale(0.96);
+        }
+
+        .btn-add {
+            background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+            color: #ffffff;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+        }
+
+        .btn-finish {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            color: #ffffff;
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+        }
+
+        /* Modal Popup Dialog */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(8px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 999;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.25s ease;
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .modal-body {
+            background: #1e293b;
+            border: 1px solid var(--card-border);
+            border-radius: 24px;
+            padding: 24px;
+            width: 90%;
+            max-width: 360px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+            transform: translateY(20px);
+            transition: transform 0.25s ease;
+        }
+
+        .modal-overlay.active .modal-body {
+            transform: translateY(0);
+        }
+
+        .modal-title {
+            font-size: 18px;
+            font-weight: 800;
+            margin-bottom: 16px;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+            font-weight: 600;
+        }
+
+        .form-select, .form-input {
+            width: 100%;
+            padding: 12px 14px;
+            background: #0f172a;
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            color: #ffffff;
+            font-size: 14px;
+            outline: none;
+        }
+
+        .form-input:focus {
+            border-color: var(--accent-cyan);
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .btn-cancel {
+            background: #334155;
+            color: var(--text-main);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- App Header -->
+    <div class="app-header">
+        <div class="brand-title">
+            <div class="brand-icon">🚗</div>
+            <div class="brand-text">
+                <h1>АВТОМОЙКА</h1>
+                <p>Дашборд смены (UTC+5)</p>
+            </div>
+        </div>
+        <div class="live-badge">
+            <div class="live-dot"></div>
+            <span>LIVE 24/7</span>
+        </div>
+    </div>
+
+    <!-- KPI Summary Grid -->
+    <div class="kpi-grid">
+        <div class="kpi-card">
+            <div class="kpi-title">Выручка за сегодня</div>
+            <div class="kpi-value" id="kpi-revenue">0 ₸</div>
+            <div class="kpi-sub" id="kpi-avg">Ср. чек: 0 ₸</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-title">Машин вымыто</div>
+            <div class="kpi-value" id="kpi-count">0</div>
+            <div class="kpi-sub">За смену сегодня</div>
+        </div>
+    </div>
+
+    <!-- Boxes Grid Section -->
+    <div class="section-header">
+        <div class="section-title">
+            <span>🏢</span> Статус боксов
+        </div>
+    </div>
+
+    <div class="boxes-grid" id="boxes-container">
+        <!-- Rendered dynamically by JS -->
+    </div>
+
+    <!-- Add Wash Modal -->
+    <div class="modal-overlay" id="add-modal">
+        <div class="modal-body">
+            <div class="modal-title" id="modal-box-title">Заезд в Бокс №1</div>
+            
+            <div class="form-group">
+                <label class="form-label">Услуга / Категория авто:</label>
+                <select class="form-select" id="modal-service">
+                    <option value="light">🚗 Легковая (3 000 ₸)</option>
+                    <option value="suv">🚙 Джип / Большая (5 000 ₸)</option>
+                    <option value="light_complex">🚗✨ Легковая Комплекс (4 500 ₸)</option>
+                    <option value="suv_complex">🚙✨ Джип Комплекс (7 000 ₸)</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">3-значный номер авто (например: 542):</label>
+                <input type="text" class="form-input" id="modal-car-num" placeholder="542" maxlength="4" inputmode="numeric">
+            </div>
+
+            <div class="modal-actions">
+                <button class="btn-action btn-cancel" onclick="closeModal()">Отмена</button>
+                <button class="btn-action btn-add" onclick="submitAddWash()">Зафиксировать</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const tg = window.Telegram?.WebApp;
+        if (tg) {
+            tg.expand();
+            tg.ready();
+        }
+
+        const BOXES = ["Бокс №1", "Бокс №2", "Бокс №3", "Бокс №4"];
+        let currentSelectedBox = "";
+        let activeWashesMap = {};
+
+        async function fetchDashboardData() {
+            try {
+                const res = await fetch('/api/washes');
+                const data = await res.json();
+                
+                // Update KPI
+                document.getElementById('kpi-revenue').innerText = `${data.stats.total_revenue.toLocaleString()} ₸`;
+                document.getElementById('kpi-avg').innerText = `Ср. чек: ${data.stats.avg_check.toLocaleString()} ₸`;
+                document.getElementById('kpi-count').innerText = data.stats.confirmed_count;
+
+                // Update Active Washes
+                activeWashesMap = {};
+                data.active.forEach(w => {
+                    activeWashesMap[w.box_name] = w;
+                });
+
+                renderBoxes();
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        function renderBoxes() {
+            const container = document.getElementById('boxes-container');
+            container.innerHTML = '';
+
+            BOXES.forEach(box => {
+                const activeWash = activeWashesMap[box];
+                const card = document.createElement('div');
+                card.className = `box-card ${activeWash ? 'occupied' : 'free'}`;
+
+                if (activeWash) {
+                    const durSec = activeWash.duration_seconds || 0;
+                    const mins = Math.floor(durSec / 60);
+                    const secs = durSec % 60;
+                    const timerStr = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+
+                    card.innerHTML = `
+                        <div class="box-top">
+                            <div class="box-name">${box}</div>
+                            <div class="box-status-tag">🔴 Занят</div>
+                        </div>
+                        <div class="box-content">
+                            <div class="car-num-badge">${activeWash.car_number || '—'}</div>
+                            <div class="service-name">${activeWash.service_name}</div>
+                            <div class="timer-display">⏱ ${timerStr}</div>
+                        </div>
+                        <button class="btn-action btn-finish" onclick="completeWash(${activeWash.id})">
+                            🏁 Оформить выезд
+                        </button>
+                    `;
+                } else {
+                    card.innerHTML = `
+                        <div class="box-top">
+                            <div class="box-name">${box}</div>
+                            <div class="box-status-tag">🟢 Свободен</div>
+                        </div>
+                        <div class="box-content">
+                            <div class="service-name" style="margin-top: 18px;">Бокс свободен</div>
+                        </div>
+                        <button class="btn-action btn-add" onclick="openAddModal('${box}')">
+                            ➕ Заехать в бокс
+                        </button>
+                    `;
+                }
+
+                container.appendChild(card);
+            });
+        }
+
+        function openAddModal(box) {
+            currentSelectedBox = box;
+            document.getElementById('modal-box-title').innerText = `Заезд в ${box}`;
+            document.getElementById('modal-car-num').value = '';
+            document.getElementById('add-modal').classList.add('active');
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
+        }
+
+        function closeModal() {
+            document.getElementById('add-modal').classList.remove('active');
+        }
+
+        async function submitAddWash() {
+            const serviceKey = document.getElementById('modal-service').value;
+            const carNumRaw = document.getElementById('modal-car-num').value.trim();
+            const formattedNum = carNumRaw ? `№${carNumRaw}` : '—';
+
+            try {
+                await fetch('/api/add_wash', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        box_name: currentSelectedBox,
+                        service_key: serviceKey,
+                        car_number: formattedNum
+                    })
+                });
+
+                closeModal();
+                if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+                fetchDashboardData();
+            } catch (e) {
+                alert("Ошибка фиксации заезда");
+            }
+        }
+
+        async function completeWash(washId) {
+            if (confirm("Подтвердите выезд машины и закрытие чека:")) {
+                try {
+                    await fetch('/api/complete_wash', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ wash_id: washId })
+                    });
+                    if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+                    fetchDashboardData();
+                } catch (e) {
+                    alert("Ошибка при закрытии чека");
+                }
+            }
+        }
+
+        // Live Seconds Increment Timer
+        setInterval(() => {
+            Object.values(activeWashesMap).forEach(w => {
+                w.duration_seconds = (w.duration_seconds || 0) + 1;
+            });
+            renderBoxes();
+        }, 1000);
+
+        // Initial Data Fetch
+        fetchDashboardData();
+        setInterval(fetchDashboardData, 5000);
+    </script>
+</body>
+</html>

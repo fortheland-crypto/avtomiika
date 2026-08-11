@@ -1,5 +1,5 @@
 from aiogram import Router, F
-from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 from aiogram.filters import CommandStart, Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
@@ -57,13 +57,17 @@ async def cmd_start(message: Message, state: FSMContext):
         "• 🚙✨ **Джип (Комплекс)**: 7 000 ₸\n\n"
         "💡 *Используйте 4 кнопки меню внизу экрана для управления заездами и статистикой.*"
     )
+    start_inline_kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="📱 Открыть Графический Дашборд", web_app=WebAppInfo(url="https://avtomiika.vercel.app/dashboard"))]
+    ])
     try:
         await message.answer_photo(
             photo=BANNER_URL,
             caption=text,
-            reply_markup=get_main_keyboard(),
+            reply_markup=start_inline_kb,
             parse_mode="Markdown"
         )
+        await message.answer("👇 **Главное меню автомойки:**", reply_markup=get_main_keyboard())
     except Exception:
         await message.answer(text, reply_markup=get_main_keyboard(), parse_mode="Markdown")
 

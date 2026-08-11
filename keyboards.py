@@ -1,10 +1,13 @@
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 from config import BOXES, SERVICES
 from database import get_active_washes
 
+DASHBOARD_URL = "https://avtomiika.vercel.app/dashboard"
+
 def get_main_keyboard() -> ReplyKeyboardMarkup:
-    """Главная клавиатура бота (без демо-смены)"""
+    """Главная клавиатура бота с кнопкой Telegram Web App Дашборда"""
     kb = [
+        [KeyboardButton(text="📱 Открыть Дашборд", web_app=WebAppInfo(url=DASHBOARD_URL))],
         [KeyboardButton(text="🚗 Зафиксировать въезд"), KeyboardButton(text="⏱ Машины в боксах")],
         [KeyboardButton(text="📊 Статистика за сегодня"), KeyboardButton(text="📋 Журнал смены")]
     ]
@@ -52,7 +55,9 @@ def get_services_inline_keyboard(box_name: str) -> InlineKeyboardMarkup:
 def get_active_washes_keyboard() -> InlineKeyboardMarkup:
     """Клавиатура для отметки завершения мойки / выписки чека"""
     active = get_active_washes()
-    inline_keyboard = []
+    inline_keyboard = [
+        [InlineKeyboardButton(text="📱 Открыть графический дашборд", web_app=WebAppInfo(url=DASHBOARD_URL))]
+    ]
     
     for w in active:
         b_name = w["box_name"]

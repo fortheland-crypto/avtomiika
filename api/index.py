@@ -7,9 +7,16 @@ import traceback
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from fastapi import FastAPI, Request
+from fastapi.responses import HTMLResponse, JSONResponse
 from aiogram import Bot, Dispatcher, types
 from config import BOT_TOKEN
-from database import init_db
+from database import (
+    init_db,
+    add_wash_entry,
+    complete_wash,
+    get_active_washes,
+    get_today_stats
+)
 from handlers import router
 
 app = FastAPI()
@@ -41,6 +48,49 @@ async def root_status():
         "bot_token_configured": is_valid_token,
         "database_status": db_status
     }
+
+@app.get("/dashboard", response_class=HTMLResponse)
+@app.get("/api/dashboard", response_class=HTMLResponse)
+async def get_dashboard_html():
+    """Эндпоинт отдачи красивого HTML5 Telegram Web App Дашборда"""
+    html_file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "static", "dashboard.html")
+    if os.path.exists(html_file_path):
+        with open(html_file_path, "r", encoding="utf-8") as f:
+            return f.read()
+    return "<h1>Дашборд загружается...</h1>"
+
+@app.get("/api/washes")
+async def get_dashboard_washes():
+    """REST API для дашборда: активные боксы и статистика за день"""
+    init_db()
+    active = get_active_washes()
+    stats = get_today_stats()
+    return {
+        "status": "ok",
+        "active": active,
+        "stats": stats
+    }
+
+@app.post("/api/add_wash")
+async def api_add_wash(request: Request):
+    """REST API для создания заезда с дашборда"""
+    init_db()
+    data = await request.json()
+    box_name = data.get("box_name")
+    service_key = data.get("service_key")
+    car_number = data.get("car_number", "—")
+    
+    wash_id = add_wash_entry(box_name, service_key, car_number=car_number)
+    return {"status": "ok", "wash_id": wash_id}
+
+@app.post("/api/complete_wash")
+async def api_complete_wash(request: Request):
+    """REST API для оформления выезда авто с дашборда"""
+    init_db()
+    data = await request.json()
+    wash_id = int(data.get("wash_id"))
+    success = complete_wash(wash_id)
+    return {"status": "ok", "completed": success}
 
 @app.post("/webhook")
 @app.post("/api/webhook")
