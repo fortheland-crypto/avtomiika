@@ -3,7 +3,12 @@ import os
 from datetime import datetime, timedelta, date
 from config import SERVICES, MIN_WASH_DURATION_SECONDS, BOXES
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "carwash.db")
+import tempfile
+
+if os.getenv("VERCEL") or not os.access(os.path.dirname(__file__), os.W_OK):
+    DB_PATH = os.path.join(tempfile.gettempdir(), "carwash.db")
+else:
+    DB_PATH = os.path.join(os.path.dirname(__file__), "carwash.db")
 
 def get_connection():
     conn = sqlite3.connect(DB_PATH)
