@@ -3,6 +3,7 @@ from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKe
 from aiogram.filters import CommandStart, Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
+from aiogram.exceptions import TelegramBadRequest
 from datetime import datetime
 
 from keyboards import (
@@ -52,7 +53,7 @@ async def cmd_start(message: Message, state: FSMContext):
         "• 🚙 **Джип / Большая машина**: 5 000 ₸\n"
         "• 🚗✨ **Легковая (Комплекс)**: 4 500 ₸\n"
         "• 🚙✨ **Джип (Комплекс)**: 7 000 ₸\n\n"
-        "💡 *Используйте кнопки меню внизу для управления заездами и отчётами.*"
+        "💡 *Используйте 4 кнопки меню внизу экрана для управления заездами и статистикой.*"
     )
     await message.answer(text, reply_markup=get_main_keyboard(), parse_mode="Markdown")
 
@@ -68,7 +69,10 @@ async def back_to_boxes_callback(callback: CallbackQuery, state: FSMContext):
     """Возврат к выбору бокса"""
     await state.clear()
     text = "🚗 **Выберите свободный бокс для заезда автомобиля:**"
-    await callback.message.edit_text(text, reply_markup=get_boxes_inline_keyboard(), parse_mode="Markdown")
+    try:
+        await callback.message.edit_text(text, reply_markup=get_boxes_inline_keyboard(), parse_mode="Markdown")
+    except TelegramBadRequest:
+        pass
     await callback.answer()
 
 @router.callback_query(F.data.startswith("select_box:"))
@@ -79,11 +83,14 @@ async def select_box_callback(callback: CallbackQuery):
         f"📍 **Выбран: {box_name}**\n\n"
         f"Укажите категорию автомобиля или услугу по прейскуранту:"
     )
-    await callback.message.edit_text(
-        text, 
-        reply_markup=get_services_inline_keyboard(box_name),
-        parse_mode="Markdown"
-    )
+    try:
+        await callback.message.edit_text(
+            text, 
+            reply_markup=get_services_inline_keyboard(box_name),
+            parse_mode="Markdown"
+        )
+    except TelegramBadRequest:
+        pass
     await callback.answer()
 
 @router.callback_query(F.data.startswith("add_wash:"))
@@ -107,7 +114,10 @@ async def add_wash_callback(callback: CallbackQuery, state: FSMContext):
         f"🔢 **Введите 3-значный номер автомобиля:**\n"
         f"*(Например, отправьте в чат: `542` или `123`)*"
     )
-    await callback.message.edit_text(text, reply_markup=keyboard, parse_mode="Markdown")
+    try:
+        await callback.message.edit_text(text, reply_markup=keyboard, parse_mode="Markdown")
+    except TelegramBadRequest:
+        pass
     await callback.answer()
 
 @router.message(WashForm.waiting_for_car_number)
@@ -145,7 +155,9 @@ async def process_car_number_input(message: Message, state: FSMContext):
         f"⏱ **Время въезда**: {now_time} *(UTC+5)*\n\n"
         f"📌 *Нажмите кнопку ниже, когда машина помоется и выедет из бокса!*"
     )
+    # Сохраняем главную reply-клавиатуру 4 кнопок активной!
     await message.answer(text, reply_markup=finish_keyboard, parse_mode="Markdown")
+    await message.answer("👇 **Главное меню автомойки:**", reply_markup=get_main_keyboard())
 
 @router.callback_query(F.data == "skip_car_number")
 async def skip_car_number_callback(callback: CallbackQuery, state: FSMContext):
@@ -178,8 +190,13 @@ async def skip_car_number_callback(callback: CallbackQuery, state: FSMContext):
         f"⏱ **Время въезда**: {now_time} *(UTC+5)*\n\n"
         f"📌 *Нажмите кнопку ниже, когда машина помоется и выедет из бокса!*"
     )
-    await callback.message.edit_text(text, reply_markup=finish_keyboard, parse_mode="Markdown")
+    try:
+        await callback.message.edit_text(text, reply_markup=finish_keyboard, parse_mode="Markdown")
+    except TelegramBadRequest:
+        await callback.message.answer(text, reply_markup=finish_keyboard, parse_mode="Markdown")
+        
     await callback.answer("Заезд успешно зафиксирован!")
+    await callback.message.answer("👇 **Главное меню автомойки:**", reply_markup=get_main_keyboard())
 
 @router.message(F.text == "⏱ Машины в боксах")
 async def show_active_washes(message: Message, state: FSMContext):
@@ -219,11 +236,14 @@ async def refresh_active_callback(callback: CallbackQuery):
     active = get_active_washes()
     
     if not active:
-        await callback.message.edit_text(
-            "🟢 **В данный момент все боксы свободны.**",
-            parse_mode="Markdown"
-        )
-        await callback.answer("Список обновлён")
+        try:
+            await callback.message.edit_text(
+                "🟢 **В данный момент все боксы свободны.**",
+                parse_mode="Markdown"
+            )
+        except TelegramBadRequest:
+            pass
+        await callback.answer("🟢 Все боксы свободны!", show_alert=True)
         return
 
     text_lines = ["⏱ **МАШИНЫ В БОКСАХ ПРЯМО СЕЙЧАС:**\n"]
@@ -238,12 +258,16 @@ async def refresh_active_callback(callback: CallbackQuery):
             f"   ⏱ В боксе: **{duration_str}** ({status_icon})\n"
         )
         
-    await callback.message.edit_text(
-        "\n".join(text_lines),
-        reply_markup=get_active_washes_keyboard(),
-        parse_mode="Markdown"
-    )
-    await callback.answer("Список обновлён")
+    try:
+        await callback.message.edit_text(
+            "\n".join(text_lines),
+            reply_markup=get_active_washes_keyboard(),
+            parse_mode="Markdown"
+        )
+    except TelegramBadRequest:
+        pass
+        
+    await callback.answer("🔄 Список обновлён!", show_alert=True)
 
 @router.callback_query(F.data.startswith("finish_wash:"))
 async def finish_wash_callback(callback: CallbackQuery):
@@ -279,18 +303,17 @@ async def finish_wash_callback(callback: CallbackQuery):
         f"🕒 **Время выезда**: **{now_time}** *(UTC+5)*"
     )
     
-    # 1. Показываем всплывающее модальное диалоговое окно в Telegram!
+    # 1. Показываем всплывающее модальное окно в Telegram
     await callback.answer("🏁 Заявка закрыта! Выезд зафиксирован.", show_alert=True)
     
     # 2. Обновляем сообщение (редактируем текстом закрытого чека)
     try:
-        if callback.message and "Въезд зафиксирован" in (callback.message.text or ""):
+        if callback.message:
             await callback.message.edit_text(text, parse_mode="Markdown", reply_markup=None)
-        else:
-            await callback.message.answer(text, parse_mode="Markdown")
-            await refresh_active_callback(callback)
-    except Exception:
+    except TelegramBadRequest:
         await callback.message.answer(text, parse_mode="Markdown")
+        
+    await callback.message.answer("👇 **Главное меню автомойки:**", reply_markup=get_main_keyboard())
 
 @router.message(F.text == "📊 Статистика за сегодня")
 async def show_today_stats(message: Message, state: FSMContext):
@@ -316,7 +339,7 @@ async def show_today_stats(message: Message, state: FSMContext):
     for b_name, b_data in stats["box_stats"].items():
         text += f"• {b_name}: **{b_data['count']}** авто — {format_currency(b_data['sum'])}\n"
         
-    await message.answer(text, parse_mode="Markdown")
+    await message.answer(text, reply_markup=get_main_keyboard(), parse_mode="Markdown")
 
 @router.message(F.text == "📋 Журнал смены")
 async def show_shift_log(message: Message, state: FSMContext):
@@ -326,7 +349,7 @@ async def show_shift_log(message: Message, state: FSMContext):
     rows = stats["all_rows"]
     
     if not rows:
-        await message.answer("📋 **Журнал за сегодня пуст.**", parse_mode="Markdown")
+        await message.answer("📋 **Журнал за сегодня пуст.**", reply_markup=get_main_keyboard(), parse_mode="Markdown")
         return
         
     lines = [f"📋 **ЖУРНАЛ ЗАЕЗДОВ ЗА СЕГОДНЯ ({stats['today_date']}):**\n"]
@@ -340,11 +363,14 @@ async def show_shift_log(message: Message, state: FSMContext):
             f"{idx}. `[{entry_time_str}]` **{r['box_name']}**{num_str} | {r['service_name']} — **{format_currency(r['price'])}** ({status_str})"
         )
         
-    await message.answer("\n".join(lines), parse_mode="Markdown")
+    await message.answer("\n".join(lines), reply_markup=get_main_keyboard(), parse_mode="Markdown")
 
 @router.callback_query(F.data == "cancel_action")
 async def cancel_action_callback(callback: CallbackQuery, state: FSMContext):
     """Отмена действия / закрытие сообщения"""
     await state.clear()
-    await callback.message.delete()
+    try:
+        await callback.message.delete()
+    except TelegramBadRequest:
+        pass
     await callback.answer("Действие отменено")
