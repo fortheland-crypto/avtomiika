@@ -14,6 +14,10 @@ from handlers import router
 
 app = FastAPI()
 
+# Глобальный Dispatcher инициализируется один раз
+dp = Dispatcher()
+dp.include_router(router)
+
 def get_telegram_bot():
     token = os.getenv("BOT_TOKEN", BOT_TOKEN)
     if not token or token == "YOUR_TELEGRAM_BOT_TOKEN_HERE":
@@ -44,8 +48,6 @@ async def telegram_webhook(request: Request):
     """Обработчик входящих вебхуков от Telegram API"""
     try:
         bot = get_telegram_bot()
-        dp = Dispatcher()
-        dp.include_router(router)
         init_db()
 
         data = await request.json()
