@@ -11,6 +11,7 @@ from keyboards import (
     get_boxes_inline_keyboard,
     get_services_inline_keyboard,
     get_active_washes_keyboard,
+    get_box_status_keyboard,
     get_shift_log_keyboard,
     get_confirm_clear_keyboard
 )
@@ -24,7 +25,7 @@ from database import (
     clear_shift_history,
     TZ_OFFSET
 )
-from config import SERVICES, MIN_WASH_DURATION_SECONDS
+from config import SERVICES, MIN_WASH_DURATION_SECONDS, BOXES
 
 router = Router()
 
@@ -72,7 +73,7 @@ async def cmd_start(message: Message, state: FSMContext):
         "• 🚙 **Джип / Большая машина**: 5 000 ₸\n"
         "• 🚗✨ **Легковая (Комплекс)**: 4 500 ₸\n"
         "• 🚙✨ **Джип (Комплекс)**: 7 000 ₸\n\n"
-        "💡 *Используйте 4 главные кнопки ниже для управления въездами, выездами и отчётами.*"
+        "💡 *Используйте 5 кнопок меню внизу экрана для полного управления автомойкой.*"
     )
     start_inline_kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="📱 Открыть Графический Дашборд", web_app=WebAppInfo(url="https://avtomiika.vercel.app/dashboard"))]
@@ -126,6 +127,72 @@ async def start_exit_process(message: Message, state: FSMContext):
         reply_markup=get_active_washes_keyboard(),
         parse_mode="Markdown"
     )
+
+@router.message(F.text == "🏢 Статус боксов")
+async def show_box_status(message: Message, state: FSMContext):
+    """Вывод общего состояния всех 4 боксов (свободен / занят) с деталями"""
+    await state.clear()
+    active = get_active_washes()
+    occupied_map = {w["box_name"]: w for w in active}
+    now = get_now()
+    
+    text_lines = ["🏢 **ТЕКУЩИЙ СТАТУС БОКСОВ:**\n"]
+    for box in BOXES:
+        if box in occupied_map:
+            w = occupied_map[box]
+            try:
+                clean_time = w["entry_time"].split(".")[0].split("+")[0]
+                entry_dt = datetime.strptime(clean_time, "%Y-%m-%d %H:%M:%S").replace(tzinfo=TZ_OFFSET)
+                dur_str = format_seconds(int((now - entry_dt).total_seconds()))
+            except Exception:
+                dur_str = "15 мин"
+                
+            car_num = w.get("car_number", "—")
+            text_lines.append(
+                f"🔴 **{box}**: **ЗАНЯТ** (Авто **{car_num}**)\n"
+                f"   🚗 Категория: {w['service_name']}\n"
+                f"   💰 Чек: {format_currency(w['price'])}\n"
+                f"   ⏱ В боксе: **{dur_str}**\n"
+            )
+        else:
+            text_lines.append(f"🟢 **{box}**: **СВОБОДЕН**\n")
+            
+    await message.answer(
+        "\n".join(text_lines),
+        reply_markup=get_box_status_keyboard(),
+        parse_mode="Markdown"
+    )
+
+@router.callback_query(F.data == "refresh_box_status")
+async def refresh_box_status_callback(callback: CallbackQuery):
+    """Обновление статуса боксов"""
+    active = get_active_washes()
+    occupied_map = {w["box_name"]: w for w in active}
+    now = get_now()
+    
+    text_lines = ["🏢 **ТЕКУЩИЙ СТАТУС БОКСОВ:**\n"]
+    for box in BOXES:
+        if box in occupied_map:
+            w = occupied_map[box]
+            try:
+                clean_time = w["entry_time"].split(".")[0].split("+")[0]
+                entry_dt = datetime.strptime(clean_time, "%Y-%m-%d %H:%M:%S").replace(tzinfo=TZ_OFFSET)
+                dur_str = format_seconds(int((now - entry_dt).total_seconds()))
+            except Exception:
+                dur_str = "15 мин"
+                
+            car_num = w.get("car_number", "—")
+            text_lines.append(
+                f"🔴 **{box}**: **ЗАНЯТ** (Авто **{car_num}**)\n"
+                f"   🚗 Категория: {w['service_name']}\n"
+                f"   💰 Чек: {format_currency(w['price'])}\n"
+                f"   ⏱ В боксе: **{dur_str}**\n"
+            )
+        else:
+            text_lines.append(f"🟢 **{box}**: **СВОБОДЕН**\n")
+            
+    await safe_update_message(callback, "\n".join(text_lines), get_box_status_keyboard())
+    await callback.answer("🔄 Статус боксов обновлён!", show_alert=True)
 
 @router.callback_query(F.data == "back_to_boxes")
 async def back_to_boxes_callback(callback: CallbackQuery, state: FSMContext):

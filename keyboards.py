@@ -5,9 +5,10 @@ from database import get_active_washes
 DASHBOARD_URL = "https://avtomiika.vercel.app/dashboard"
 
 def get_main_keyboard() -> ReplyKeyboardMarkup:
-    """Главная клавиатура бота: 4 чистые понятные кнопки"""
+    """Главная клавиатура бота с 5 основными функциями"""
     kb = [
         [KeyboardButton(text="🚗 Зафиксировать въезд"), KeyboardButton(text="🏁 Зафиксировать выезд")],
+        [KeyboardButton(text="🏢 Статус боксов"), KeyboardButton(text="⏱ Машины в боксах")],
         [KeyboardButton(text="📊 Статистика за сегодня"), KeyboardButton(text="📋 Журнал смены")]
     ]
     return ReplyKeyboardMarkup(keyboard=kb, resize_keyboard=True)
@@ -76,6 +77,15 @@ def get_active_washes_keyboard() -> InlineKeyboardMarkup:
         InlineKeyboardButton(text="❌ Закрыть", callback_data="cancel_action")
     ])
     
+    return InlineKeyboardMarkup(inline_keyboard=inline_keyboard)
+
+def get_box_status_keyboard() -> InlineKeyboardMarkup:
+    """Клавиатура для отчёта о статусе боксов"""
+    inline_keyboard = [
+        [InlineKeyboardButton(text="📱 Открыть Графический Дашборд", web_app=WebAppInfo(url=DASHBOARD_URL))],
+        [InlineKeyboardButton(text="🔄 Обновить статус боксов", callback_data="refresh_box_status")],
+        [InlineKeyboardButton(text="❌ Закрыть", callback_data="cancel_action")]
+    ]
     return InlineKeyboardMarkup(inline_keyboard=inline_keyboard)
 
 def get_shift_log_keyboard() -> InlineKeyboardMarkup:
