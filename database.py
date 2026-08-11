@@ -25,15 +25,20 @@ def init_db():
                 service_key TEXT NOT NULL,
                 service_name TEXT NOT NULL,
                 price INTEGER NOT NULL,
+                car_number TEXT DEFAULT '—',
                 entry_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 exit_time TIMESTAMP,
                 status TEXT NOT NULL DEFAULT 'in_box'
             )
         """)
+        try:
+            cursor.execute("ALTER TABLE washes ADD COLUMN car_number TEXT DEFAULT '—'")
+        except sqlite3.OperationalError:
+            pass
         conn.commit()
 
-def add_wash_entry(box_name: str, service_key: str) -> int:
-    """Фиксация заезда машины в бокс"""
+def add_wash_entry(box_name: str, service_key: str, car_number: str = "—") -> int:
+    """Фиксация заезда машины с 3-значным номером в бокс"""
     if service_key not in SERVICES:
         raise ValueError("Неизвестная услуга")
     
@@ -50,11 +55,11 @@ def add_wash_entry(box_name: str, service_key: str) -> int:
             WHERE box_name = ? AND status = 'in_box'
         """, (now_str, box_name))
         
-        # Создаём новую запись о заезде
+        # Создаём новую запись о заезде с номером авто
         cursor.execute("""
-            INSERT INTO washes (box_name, service_key, service_name, price, entry_time, status)
-            VALUES (?, ?, ?, ?, ?, 'in_box')
-        """, (box_name, service_key, service["title"], service["price"], now_str))
+            INSERT INTO washes (box_name, service_key, service_name, price, car_number, entry_time, status)
+            VALUES (?, ?, ?, ?, ?, ?, 'in_box')
+        """, (box_name, service_key, service["title"], service["price"], car_number, now_str))
         
         conn.commit()
         return cursor.lastrowid
@@ -108,7 +113,6 @@ def get_active_washes():
 def get_today_stats():
     """
     Расчёт статистики автомойки за текущую смену / день.
-    Учитываются абсолютно все боксы (Бокс №1, Бокс №2, Бокс №3, Бокс №4).
     """
     with get_connection() as conn:
         cursor = conn.cursor()
@@ -148,7 +152,7 @@ def get_today_stats():
         service_stats[title]["count"] += 1
         service_stats[title]["sum"] += w["price"]
         
-    # Разбивка по боксам (гарантированно Бокс №1, Бокс №2, Бокс №3, Бокс №4)
+    # Разбивка по боксам
     box_stats = {box: {"count": 0, "sum": 0} for box in BOXES}
     for w in confirmed_washes:
         b_name = w["box_name"]
@@ -170,8 +174,7 @@ def get_today_stats():
 
 def generate_demo_shift():
     """
-    Генерация динамической демо-смены за сегодня для всех 4 боксов:
-    Заполняет журнал 14 прошедшими заездами + 2 активными заездами в Боксе №3 и Боксе №4.
+    Генерация наглядной демо-смены с 3-значными номерами авто.
     """
     with get_connection() as conn:
         cursor = conn.cursor()
@@ -179,53 +182,53 @@ def generate_demo_shift():
         
         now = datetime.now()
         
-        # 14 прошлых заездов по всем боксам 1, 2, 3, 4
         demo_offsets = [
-            ("Бокс №1", "light", 360, 20),
-            ("Бокс №2", "suv", 330, 25),
-            ("Бокс №3", "light_complex", 300, 35),
-            ("Бокс №4", "light", 270, 18),
-            ("Бокс №1", "suv_complex", 240, 40),
-            ("Бокс №2", "light", 210, 22),
-            ("Бокс №3", "suv", 180, 28),
-            ("Бокс №4", "light_complex", 150, 30),
-            ("Бокс №1", "light", 120, 19),
-            ("Бокс №2", "suv_complex", 90, 45),
-            ("Бокс №3", "light", 75, 21),
-            ("Бокс №4", "suv", 60, 26),
-            ("Бокс №1", "light_complex", 45, 32),
-            ("Бокс №2", "light", 30, 20),
+            ("Бокс №1", "light", "542", 360, 20),
+            ("Бокс №2", "suv", "109", 330, 25),
+            ("Бокс №3", "light_complex", "777", 300, 35),
+            ("Бокс №4", "light", "341", 270, 18),
+            ("Бокс №1", "suv_complex", "812", 240, 40),
+            ("Бокс №2", "light", "405", 210, 22),
+            ("Бокс №3", "suv", "923", 180, 28),
+            ("Бокс №4", "light_complex", "618", 150, 30),
+            ("Бокс №1", "light", "254", 120, 19),
+            ("Бокс №2", "suv_complex", "730", 90, 45),
+            ("Бокс №3", "light", "189", 75, 21),
+            ("Бокс №4", "suv", "650", 60, 26),
+            ("Бокс №1", "light_complex", "432", 45, 32),
+            ("Бокс №2", "light", "891", 30, 20),
         ]
         
-        for box, serv_key, offset_m, duration_m in demo_offsets:
+        for box, serv_key, num, offset_m, duration_m in demo_offsets:
             serv = SERVICES[serv_key]
             entry_dt = now - timedelta(minutes=offset_m)
             exit_dt = entry_dt + timedelta(minutes=duration_m)
             
             cursor.execute("""
-                INSERT INTO washes (box_name, service_key, service_name, price, entry_time, exit_time, status)
-                VALUES (?, ?, ?, ?, ?, ?, 'completed')
+                INSERT INTO washes (box_name, service_key, service_name, price, car_number, entry_time, exit_time, status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, 'completed')
             """, (
                 box, 
                 serv_key, 
                 serv["title"], 
                 serv["price"], 
+                num,
                 entry_dt.strftime("%Y-%m-%d %H:%M:%S"), 
                 exit_dt.strftime("%Y-%m-%d %H:%M:%S")
             ))
             
-        # Добавляем 2 машины прямо сейчас в Бокс №3 и Бокс №4
+        # Добавляем 2 активные машины с номерами (№307 и №542) в Бокс №3 и Бокс №4
         entry_active1 = (now - timedelta(minutes=14)).strftime("%Y-%m-%d %H:%M:%S")
         entry_active2 = (now - timedelta(minutes=4)).strftime("%Y-%m-%d %H:%M:%S")
         
         cursor.execute("""
-            INSERT INTO washes (box_name, service_key, service_name, price, entry_time, status)
-            VALUES (?, ?, ?, ?, ?, 'in_box')
-        """, ("Бокс №3", "suv", SERVICES["suv"]["title"], SERVICES["suv"]["price"], entry_active1))
+            INSERT INTO washes (box_name, service_key, service_name, price, car_number, entry_time, status)
+            VALUES (?, ?, ?, ?, ?, ?, 'in_box')
+        """, ("Бокс №3", "suv", SERVICES["suv"]["title"], SERVICES["suv"]["price"], "307", entry_active1))
         
         cursor.execute("""
-            INSERT INTO washes (box_name, service_key, service_name, price, entry_time, status)
-            VALUES (?, ?, ?, ?, ?, 'in_box')
-        """, ("Бокс №4", "light_complex", SERVICES["light_complex"]["title"], SERVICES["light_complex"]["price"], entry_active2))
+            INSERT INTO washes (box_name, service_key, service_name, price, car_number, entry_time, status)
+            VALUES (?, ?, ?, ?, ?, ?, 'in_box')
+        """, ("Бокс №4", "light_complex", SERVICES["light_complex"]["title"], SERVICES["light_complex"]["price"], "542", entry_active2))
 
         conn.commit()
