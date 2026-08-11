@@ -33,7 +33,7 @@
 
         body {
             background: 
-                linear-gradient(180deg, rgba(11, 15, 25, 0.82) 0%, rgba(15, 23, 42, 0.92) 100%),
+                linear-gradient(180deg, rgba(11, 15, 25, 0.85) 0%, rgba(15, 23, 42, 0.92) 100%),
                 url('https://raw.githubusercontent.com/fortheland-crypto/avtomiika/main/carwash_banner.jpg') no-repeat center center / cover;
             color: var(--text-main);
             height: 100vh;
@@ -43,7 +43,6 @@
             overflow-y: auto;
             display: flex;
             flex-direction: column;
-            justify-content: space-between;
         }
 
         .app-header {
@@ -54,7 +53,6 @@
             padding-bottom: 6px;
             border-bottom: 1px solid var(--card-border);
             flex-shrink: 0;
-            backdrop-filter: blur(10px);
         }
 
         .brand-title {
@@ -64,19 +62,19 @@
         }
 
         .brand-icon {
-            width: 34px;
-            height: 34px;
+            width: 32px;
+            height: 32px;
             background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
             border-radius: 10px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 17px;
-            box-shadow: 0 0 16px rgba(59, 130, 246, 0.5);
+            font-size: 16px;
+            box-shadow: 0 0 14px rgba(59, 130, 246, 0.5);
         }
 
         .brand-text h1 {
-            font-size: 16px;
+            font-size: 15px;
             font-weight: 800;
             background: linear-gradient(to right, #ffffff, var(--accent-cyan));
             -webkit-background-clip: text;
@@ -89,34 +87,51 @@
             color: var(--text-muted);
         }
 
-        .live-badge {
-            background: rgba(34, 197, 94, 0.18);
-            color: var(--accent-green);
-            border: 1px solid rgba(34, 197, 94, 0.4);
-            padding: 3px 8px;
-            border-radius: 16px;
-            font-size: 10px;
-            font-weight: 700;
+        /* Navigation Tabs Bar */
+        .nav-tabs-bar {
             display: flex;
-            align-items: center;
-            gap: 5px;
+            background: rgba(15, 23, 42, 0.85);
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            padding: 3px;
+            margin-bottom: 8px;
+            gap: 4px;
+            flex-shrink: 0;
         }
 
-        .live-dot {
-            width: 6px;
-            height: 6px;
-            background-color: var(--accent-green);
-            border-radius: 50%;
-            animation: pulse 1.5s infinite;
+        .nav-tab {
+            flex: 1;
+            padding: 7px 4px;
+            border: none;
+            background: transparent;
+            color: var(--text-muted);
+            font-size: 11px;
+            font-weight: 700;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            text-align: center;
+            white-space: nowrap;
         }
 
-        @keyframes pulse {
-            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
-            70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(34, 197, 94, 0); }
-            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+        .nav-tab.active {
+            background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+            color: #ffffff;
+            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
         }
 
-        /* KPI Cards */
+        /* View Content Sections */
+        .tab-view {
+            display: none;
+            flex-grow: 1;
+            flex-direction: column;
+        }
+
+        .tab-view.active {
+            display: flex;
+        }
+
+        /* KPI Grid */
         .kpi-grid {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
@@ -127,7 +142,7 @@
 
         .kpi-card {
             background: var(--card-bg);
-            backdrop-filter: blur(16px);
+            backdrop-filter: blur(12px);
             border: 1px solid var(--card-border);
             border-radius: 12px;
             padding: 8px 10px;
@@ -154,7 +169,7 @@
         }
 
         .kpi-value {
-            font-size: 17px;
+            font-size: 16px;
             font-weight: 800;
             color: #ffffff;
             line-height: 1.2;
@@ -163,17 +178,6 @@
         .kpi-sub {
             font-size: 9px;
             color: var(--accent-cyan);
-        }
-
-        /* Section Title */
-        .section-title {
-            font-size: 13px;
-            font-weight: 700;
-            margin-bottom: 6px;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            flex-shrink: 0;
         }
 
         /* Boxes Grid */
@@ -187,14 +191,14 @@
 
         .box-card {
             background: var(--card-bg);
-            backdrop-filter: blur(16px);
+            backdrop-filter: blur(12px);
             border: 1px solid var(--card-border);
             border-radius: 14px;
             padding: 10px;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
-            min-height: 125px;
+            min-height: 120px;
             box-shadow: var(--glass-shadow);
         }
 
@@ -236,10 +240,6 @@
             color: var(--accent-red);
         }
 
-        .box-content {
-            margin: 4px 0;
-        }
-
         .car-num-badge {
             display: inline-block;
             background: #ffffff;
@@ -249,7 +249,6 @@
             padding: 1px 6px;
             border-radius: 5px;
             margin-bottom: 2px;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
         }
 
         .service-name {
@@ -290,13 +289,56 @@
         .btn-add {
             background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
             color: #ffffff;
-            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
         }
 
         .btn-finish {
             background: linear-gradient(135deg, #ef4444, #dc2626);
             color: #ffffff;
-            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+        }
+
+        .btn-clear {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            color: #ffffff;
+            padding: 10px;
+            font-size: 12px;
+            border-radius: 10px;
+            margin-bottom: 12px;
+            border: none;
+            font-weight: 700;
+            cursor: pointer;
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        /* Stats & Shift List Cards */
+        .list-card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            padding: 10px;
+            margin-bottom: 8px;
+        }
+
+        .list-card-title {
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--accent-cyan);
+            margin-bottom: 6px;
+        }
+
+        .list-item {
+            font-size: 11px;
+            padding: 4px 0;
+            border-bottom: 1px dashed rgba(255,255,255,0.06);
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .list-item:last-child {
+            border-bottom: none;
         }
 
         /* Modal Popups */
@@ -456,15 +498,6 @@
             opacity: 1;
             transform: translateX(-50%) translateY(0);
         }
-
-        @media screen and (max-height: 650px) {
-            body { padding: 6px 8px; }
-            .app-header { margin-bottom: 4px; padding-bottom: 4px; }
-            .kpi-grid { margin-bottom: 4px; }
-            .box-card { padding: 8px; min-height: 110px; }
-            .car-num-badge { font-size: 12px; }
-            .btn-action { padding: 5px 6px; font-size: 10px; }
-        }
     </style>
 </head>
 <body>
@@ -480,34 +513,62 @@
                 <p>Дашборд смены (UTC+5)</p>
             </div>
         </div>
-        <div class="live-badge">
-            <div class="live-dot"></div>
-            <span>LIVE 24/7</span>
+    </div>
+
+    <!-- Navigation Tabs Bar -->
+    <div class="nav-tabs-bar">
+        <button class="nav-tab active" onclick="switchTab('boxes')">🏢 Боксы</button>
+        <button class="nav-tab" onclick="switchTab('stats')">📊 Статистика</button>
+        <button class="nav-tab" onclick="switchTab('log')">📋 Журнал смены</button>
+    </div>
+
+    <!-- Tab 1: Boxes View -->
+    <div class="tab-view active" id="view-boxes">
+        <div class="kpi-grid">
+            <div class="kpi-card">
+                <div class="kpi-title">Выручка за сегодня</div>
+                <div class="kpi-value" id="kpi-revenue">0 ₸</div>
+                <div class="kpi-sub" id="kpi-avg">Ср. чек: 0 ₸</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-title">Машин вымыто</div>
+                <div class="kpi-value" id="kpi-count">0</div>
+                <div class="kpi-sub">За смену сегодня</div>
+            </div>
+        </div>
+
+        <div class="boxes-grid" id="boxes-container">
+            <!-- Rendered by JS -->
         </div>
     </div>
 
-    <!-- KPI Grid -->
-    <div class="kpi-grid">
-        <div class="kpi-card">
-            <div class="kpi-title">Выручка за сегодня</div>
-            <div class="kpi-value" id="kpi-revenue">0 ₸</div>
-            <div class="kpi-sub" id="kpi-avg">Ср. чек: 0 ₸</div>
+    <!-- Tab 2: Statistics View -->
+    <div class="tab-view" id="view-stats">
+        <div class="list-card">
+            <div class="list-card-title">📈 Выручка по услугам</div>
+            <div id="stats-services-container">
+                <!-- Rendered by JS -->
+            </div>
         </div>
-        <div class="kpi-card">
-            <div class="kpi-title">Машин вымыто</div>
-            <div class="kpi-value" id="kpi-count">0</div>
-            <div class="kpi-sub">За смену сегодня</div>
+        <div class="list-card">
+            <div class="list-card-title">🏢 Загрузка боксов</div>
+            <div id="stats-boxes-container">
+                <!-- Rendered by JS -->
+            </div>
         </div>
     </div>
 
-    <!-- Boxes Header -->
-    <div class="section-title">
-        <span>🏢</span> Состояние боксов
-    </div>
-
-    <!-- Boxes Container -->
-    <div class="boxes-grid" id="boxes-container">
-        <!-- Rendered by JS -->
+    <!-- Tab 3: Shift Log View -->
+    <div class="tab-view" id="view-log">
+        <button class="btn-clear" onclick="openClearModal()">
+            🗑 Очистить журнал смены
+        </button>
+        <div class="list-card" style="flex-grow: 1;">
+            <div class="list-card-title">📋 История заездов за сегодня</div>
+            <div id="shift-log-container">
+                <!-- Rendered by JS -->
+            </div>
+        </div>
     </div>
 
     <!-- Add Wash Modal -->
@@ -567,6 +628,20 @@
         </div>
     </div>
 
+    <!-- Confirm Clear Modal -->
+    <div class="modal-overlay" id="clear-modal">
+        <div class="modal-body">
+            <div class="modal-title" style="margin-bottom: 10px; color: #f59e0b;">⚠️ Очистка журнала смены</div>
+            <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 16px;">
+                Вы действительно хотите очистить все данные журнала смены и обнулить статистику за сегодня?
+            </p>
+            <div class="modal-footer">
+                <button class="btn-action btn-cancel" onclick="closeClearModal()">Отмена</button>
+                <button class="btn-action btn-clear" style="margin-bottom:0;" onclick="submitClearShift()">✅ Да, очистить всё</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         const tg = window.Telegram?.WebApp;
         if (tg) {
@@ -579,6 +654,7 @@
         let selectedServiceKey = "light";
         let targetWashIdToFinish = null;
         let activeWashesMap = {};
+        let latestDashboardData = null;
 
         function showToast(text) {
             const toast = document.getElementById('toast');
@@ -587,10 +663,28 @@
             setTimeout(() => toast.classList.remove('show'), 2500);
         }
 
+        function switchTab(tabName) {
+            document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-view').forEach(v => v.classList.remove('active'));
+
+            if (tabName === 'boxes') {
+                document.querySelectorAll('.nav-tab')[0].classList.add('active');
+                document.getElementById('view-boxes').classList.add('active');
+            } else if (tabName === 'stats') {
+                document.querySelectorAll('.nav-tab')[1].classList.add('active');
+                document.getElementById('view-stats').classList.add('active');
+            } else if (tabName === 'log') {
+                document.querySelectorAll('.nav-tab')[2].classList.add('active');
+                document.getElementById('view-log').classList.add('active');
+            }
+            if (tg?.HapticFeedback) tg.HapticFeedback.selectionChanged();
+        }
+
         async function fetchDashboardData() {
             try {
                 const res = await fetch('/api/washes');
                 const data = await res.json();
+                latestDashboardData = data;
                 
                 document.getElementById('kpi-revenue').innerText = `${data.stats.total_revenue.toLocaleString()} ₸`;
                 document.getElementById('kpi-avg').innerText = `Ср. чек: ${data.stats.avg_check.toLocaleString()} ₸`;
@@ -602,6 +696,8 @@
                 });
 
                 renderBoxes();
+                renderStats(data.stats);
+                renderLog(data.stats.all_rows);
             } catch (e) {
                 console.error(e);
             }
@@ -657,6 +753,60 @@
                         </button>
                     `;
                 }
+            });
+        }
+
+        function renderStats(stats) {
+            const sContainer = document.getElementById('stats-services-container');
+            const bContainer = document.getElementById('stats-boxes-container');
+            sContainer.innerHTML = '';
+            bContainer.innerHTML = '';
+
+            let hasServices = false;
+            Object.entries(stats.service_stats).forEach(([title, data]) => {
+                if (data.count > 0) {
+                    hasServices = true;
+                    sContainer.innerHTML += `
+                        <div class="list-item">
+                            <span>• ${title} (${data.count} авто)</span>
+                            <span style="font-weight:700; color:var(--accent-cyan);">${data.sum.toLocaleString()} ₸</span>
+                        </div>
+                    `;
+                }
+            });
+            if (!hasServices) sContainer.innerHTML = '<div style="font-size:11px; color:var(--text-muted);">Заездов пока нет</div>';
+
+            Object.entries(stats.box_stats).forEach(([box, data]) => {
+                bContainer.innerHTML += `
+                    <div class="list-item">
+                        <span>• ${box} (${data.count} авто)</span>
+                        <span style="font-weight:700;">${data.sum.toLocaleString()} ₸</span>
+                    </div>
+                `;
+            });
+        }
+
+        function renderLog(rows) {
+            const container = document.getElementById('shift-log-container');
+            container.innerHTML = '';
+
+            if (!rows || rows.length === 0) {
+                container.innerHTML = '<div style="font-size:11px; color:var(--text-muted); padding:10px 0;">Журнал смены пуст</div>';
+                return;
+            }
+
+            rows.forEach((r, idx) => {
+                const timeStr = r.entry_time.split(' ')[1]?.slice(0,5) || '12:00';
+                const isDone = r.status === 'completed';
+                const statusStr = isDone ? '🟢 Выехала' : '🔴 В боксе';
+                const carNumStr = (r.car_number && r.car_number !== '—') ? `<b>${r.car_number}</b>` : '—';
+
+                container.innerHTML += `
+                    <div class="list-item">
+                        <span>${idx + 1}. [${timeStr}] <b>${r.box_name}</b> (${carNumStr}) | ${r.service_name}</span>
+                        <span style="font-weight:700; color:${isDone ? 'var(--accent-green)' : 'var(--accent-red)'};">${r.price.toLocaleString()} ₸ (${statusStr})</span>
+                    </div>
+                `;
             });
         }
 
@@ -741,7 +891,28 @@
             }
         }
 
-        // Increment timers in-place on existing DOM elements
+        function openClearModal() {
+            document.getElementById('clear-modal').classList.add('active');
+            if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('heavy');
+        }
+
+        function closeClearModal() {
+            document.getElementById('clear-modal').classList.remove('active');
+        }
+
+        async function submitClearShift() {
+            closeClearModal();
+            try {
+                await fetch('/api/clear_shift', { method: 'POST' });
+                showToast("🗑 Журнал смены и статистика очищены!");
+                if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+                fetchDashboardData();
+            } catch (e) {
+                showToast("⚠️ Ошибка очистки");
+            }
+        }
+
+        // Increment timers in-place
         setInterval(() => {
             Object.values(activeWashesMap).forEach(w => {
                 w.duration_seconds = (w.duration_seconds || 0) + 1;

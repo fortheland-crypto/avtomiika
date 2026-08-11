@@ -14,7 +14,8 @@ from database import (
     add_wash_entry,
     complete_wash,
     get_active_washes,
-    get_today_stats
+    get_today_stats,
+    clear_shift_history
 )
 from handlers import router
 
@@ -89,6 +90,13 @@ async def api_complete_wash(request: Request):
     wash_id = int(data.get("wash_id"))
     success = complete_wash(wash_id)
     return {"status": "ok", "completed": success}
+
+@app.post("/api/clear_shift")
+async def api_clear_shift():
+    """REST API для полной очистки журнала смены с дашборда"""
+    init_db()
+    clear_shift_history()
+    return {"status": "ok"}
 
 @app.post("/webhook")
 @app.post("/api/webhook")
