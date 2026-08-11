@@ -10,7 +10,9 @@ from keyboards import (
     get_main_keyboard,
     get_boxes_inline_keyboard,
     get_services_inline_keyboard,
-    get_active_washes_keyboard
+    get_active_washes_keyboard,
+    get_shift_log_keyboard,
+    get_confirm_clear_keyboard
 )
 from database import (
     add_wash_entry,
@@ -19,6 +21,7 @@ from database import (
     get_today_stats,
     get_wash_by_id,
     get_now,
+    clear_shift_history,
     TZ_OFFSET
 )
 from config import SERVICES, MIN_WASH_DURATION_SECONDS
@@ -354,7 +357,7 @@ async def show_today_stats(message: Message, state: FSMContext):
 
 @router.message(F.text == "📋 Журнал смены")
 async def show_shift_log(message: Message, state: FSMContext):
-    """Детализированный журнал заездов за сегодняшний день"""
+    """Детализированный журнал заездов за сегодняшний день с возможностью очистки"""
     await state.clear()
     stats = get_today_stats()
     rows = stats["all_rows"]
@@ -374,7 +377,32 @@ async def show_shift_log(message: Message, state: FSMContext):
             f"{idx}. `[{entry_time_str}]` **{r['box_name']}**{num_str} | {r['service_name']} — **{format_currency(r['price'])}** ({status_str})"
         )
         
-    await message.answer("\n".join(lines), reply_markup=get_main_keyboard(), parse_mode="Markdown")
+    await message.answer("\n".join(lines), reply_markup=get_shift_log_keyboard(), parse_mode="Markdown")
+
+@router.callback_query(F.data == "ask_clear_shift")
+async def ask_clear_shift_callback(callback: CallbackQuery):
+    """Запрос подтверждения перед очисткой журнала смены"""
+    text = (
+        "⚠️ **ВЫ УВЕРЕНЫ, ЧТО ХОТИТЕ ОЧИСТИТЬ ЖУРНАЛ СМЕНЫ?**\n\n"
+        "При подтверждении все данные заездов и статистика за сегодняшний день будут безвозвратно сброшены."
+    )
+    try:
+        await callback.message.edit_text(text, reply_markup=get_confirm_clear_keyboard(), parse_mode="Markdown")
+    except TelegramBadRequest:
+        await callback.message.answer(text, reply_markup=get_confirm_clear_keyboard(), parse_mode="Markdown")
+    await callback.answer()
+
+@router.callback_query(F.data == "confirm_clear_shift")
+async def confirm_clear_shift_callback(callback: CallbackQuery):
+    """Подтверждение и выполнение полной очистки журнала смены"""
+    clear_shift_history()
+    await callback.answer("🗑 Журнал смены и статистика за сегодня очищены!", show_alert=True)
+    text = "🗑 **Журнал смены очищен.**\nВсе записи заездов и статистика за сегодня успешно сброшены."
+    try:
+        await callback.message.edit_text(text, reply_markup=None, parse_mode="Markdown")
+    except TelegramBadRequest:
+        await callback.message.answer(text, parse_mode="Markdown")
+    await callback.message.answer("👇 **Главное меню автомойки:**", reply_markup=get_main_keyboard())
 
 @router.callback_query(F.data == "cancel_action")
 async def cancel_action_callback(callback: CallbackQuery, state: FSMContext):

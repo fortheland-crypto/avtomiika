@@ -188,6 +188,13 @@ def get_today_stats():
         "all_rows": rows
     }
 
+def clear_shift_history():
+    """Очистка всех записей журнала смены и статистики"""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM washes")
+        conn.commit()
+
 def generate_demo_shift():
     """
     Генерация смены по локальному времени (UTC+5) с 3-значными номерами.

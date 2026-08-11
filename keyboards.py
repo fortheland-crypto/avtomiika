@@ -5,9 +5,8 @@ from database import get_active_washes
 DASHBOARD_URL = "https://avtomiika.vercel.app/dashboard"
 
 def get_main_keyboard() -> ReplyKeyboardMarkup:
-    """Главная клавиатура бота с кнопкой Telegram Web App Дашборда"""
+    """Главная клавиатура бота (ровно 4 чистые кнопки без лишних строк)"""
     kb = [
-        [KeyboardButton(text="📱 Открыть Дашборд", web_app=WebAppInfo(url=DASHBOARD_URL))],
         [KeyboardButton(text="🚗 Зафиксировать въезд"), KeyboardButton(text="⏱ Машины в боксах")],
         [KeyboardButton(text="📊 Статистика за сегодня"), KeyboardButton(text="📋 Журнал смены")]
     ]
@@ -56,7 +55,7 @@ def get_active_washes_keyboard() -> InlineKeyboardMarkup:
     """Клавиатура для отметки завершения мойки / выписки чека"""
     active = get_active_washes()
     inline_keyboard = [
-        [InlineKeyboardButton(text="📱 Открыть графический дашборд", web_app=WebAppInfo(url=DASHBOARD_URL))]
+        [InlineKeyboardButton(text="📱 Открыть Графический Дашборд", web_app=WebAppInfo(url=DASHBOARD_URL))]
     ]
     
     for w in active:
@@ -74,4 +73,22 @@ def get_active_washes_keyboard() -> InlineKeyboardMarkup:
         InlineKeyboardButton(text="❌ Закрыть", callback_data="cancel_action")
     ])
     
+    return InlineKeyboardMarkup(inline_keyboard=inline_keyboard)
+
+def get_shift_log_keyboard() -> InlineKeyboardMarkup:
+    """Клавиатура для журнала смены с кнопкой очистки"""
+    inline_keyboard = [
+        [InlineKeyboardButton(text="📱 Открыть Графический Дашборд", web_app=WebAppInfo(url=DASHBOARD_URL))],
+        [InlineKeyboardButton(text="🗑 Очистить журнал смены", callback_data="ask_clear_shift")]
+    ]
+    return InlineKeyboardMarkup(inline_keyboard=inline_keyboard)
+
+def get_confirm_clear_keyboard() -> InlineKeyboardMarkup:
+    """Клавиатура подтверждения очистки журнала"""
+    inline_keyboard = [
+        [
+            InlineKeyboardButton(text="✅ Да, очистить всё", callback_data="confirm_clear_shift"),
+            InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_action")
+        ]
+    ]
     return InlineKeyboardMarkup(inline_keyboard=inline_keyboard)
