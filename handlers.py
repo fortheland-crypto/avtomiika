@@ -78,14 +78,14 @@ async def cmd_start(message: Message, state: FSMContext):
 async def start_entry_process(message: Message, state: FSMContext):
     """Начало фиксации заезда: выбор бокса"""
     await state.clear()
-    text = "🚗 **Выберите свободный бокс для заезда автомобиля:**"
+    text = "🚗 **Выберите свободный бокс для заезда или занятый бокс для выезда:**"
     await message.answer(text, reply_markup=get_boxes_inline_keyboard(), parse_mode="Markdown")
 
 @router.callback_query(F.data == "back_to_boxes")
 async def back_to_boxes_callback(callback: CallbackQuery, state: FSMContext):
     """Возврат к выбору бокса"""
     await state.clear()
-    text = "🚗 **Выберите свободный бокс для заезда автомобиля:**"
+    text = "🚗 **Выберите свободный бокс для заезда или занятый бокс для выезда:**"
     try:
         await callback.message.edit_text(text, reply_markup=get_boxes_inline_keyboard(), parse_mode="Markdown")
     except TelegramBadRequest:
@@ -94,10 +94,48 @@ async def back_to_boxes_callback(callback: CallbackQuery, state: FSMContext):
 
 @router.callback_query(F.data.startswith("select_box:"))
 async def select_box_callback(callback: CallbackQuery):
-    """Выбор бокса: показ прейскуранта категорий авто"""
+    """Выбор бокса: показ занятости или прейскуранта категорий авто"""
     box_name = callback.data.split(":")[1]
+    active_washes = get_active_washes()
+    occupied_map = {w["box_name"]: w for w in active_washes}
+    
+    if box_name in occupied_map:
+        # Бокс ЗАНЯТ: Показываем карточку машины в боксе и кнопку выезда
+        w = occupied_map[box_name]
+        now = get_now()
+        try:
+            clean_time = w["entry_time"].split(".")[0].split("+")[0]
+            entry_dt = datetime.strptime(clean_time, "%Y-%m-%d %H:%M:%S").replace(tzinfo=TZ_OFFSET)
+            dur_str = format_seconds(int((now - entry_dt).total_seconds()))
+        except Exception:
+            dur_str = "15 мин"
+            
+        car_num = w.get("car_number", "—")
+        
+        text = (
+            f"🔴 **{box_name} В ДАННЫЙ МОМЕНТ ЗАНЯТ**\n\n"
+            f"🔢 **Номер авто**: **{car_num}**\n"
+            f"🚗 **Категория**: {w['service_name']}\n"
+            f"💰 **К оплате**: **{format_currency(w['price'])}**\n"
+            f"⏱ **Время в боксе**: **{dur_str}**\n\n"
+            f"📌 *Вы можете оформить выезд этой машины ниже:*"
+        )
+        
+        kb = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text=f"🏁 Оформить выезд ({car_num})", callback_data=f"ask_finish_wash:{w['id']}")],
+            [InlineKeyboardButton(text="⬅️ К выбору боксов", callback_data="back_to_boxes"), InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_action")]
+        ])
+        
+        try:
+            await callback.message.edit_text(text, reply_markup=kb, parse_mode="Markdown")
+        except TelegramBadRequest:
+            pass
+        await callback.answer()
+        return
+
+    # Бокс СВОБОДЕН — показываем выбор услуг по прейскуранту
     text = (
-        f"📍 **Выбран: {box_name}**\n\n"
+        f"🟢 **{box_name} (Свободен)**\n\n"
         f"Укажите категорию автомобиля или услугу по прейскуранту:"
     )
     try:
@@ -160,7 +198,7 @@ async def process_car_number_input(message: Message, state: FSMContext):
     now_time = get_now().strftime("%H:%M:%S")
     
     finish_keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text=f"🏁 Оформить выезд ({formatted_num})", callback_data=f"finish_wash:{wash_id}")]
+        [InlineKeyboardButton(text=f"🏁 Оформить выезд ({formatted_num})", callback_data=f"ask_finish_wash:{wash_id}")]
     ])
     
     text = (
@@ -194,7 +232,7 @@ async def skip_car_number_callback(callback: CallbackQuery, state: FSMContext):
     now_time = get_now().strftime("%H:%M:%S")
     
     finish_keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text=f"🏁 Оформить выезд ({box_name})", callback_data=f"finish_wash:{wash_id}")]
+        [InlineKeyboardButton(text=f"🏁 Оформить выезд ({box_name})", callback_data=f"ask_finish_wash:{wash_id}")]
     ])
     
     text = (
@@ -285,14 +323,49 @@ async def refresh_active_callback(callback: CallbackQuery):
         
     await callback.answer("🔄 Список обновлён!", show_alert=True)
 
-@router.callback_query(F.data.startswith("finish_wash:"))
-async def finish_wash_callback(callback: CallbackQuery):
-    """Отметка о выезде машины из бокса с всплывающим окном и закрытием заявки"""
+@router.callback_query(F.data.startswith("ask_finish_wash:") | F.data.startswith("finish_wash:"))
+async def ask_finish_wash_callback(callback: CallbackQuery):
+    """Запрос подтверждения выезда машины из бокса с визуальной карточкой"""
     wash_id = int(callback.data.split(":")[1])
     wash_data = get_wash_by_id(wash_id)
     
-    if not wash_data:
+    if not wash_data or wash_data["status"] == "completed":
         await callback.answer("⚠️ Заявка уже была закрыта ранее.", show_alert=True)
+        return
+
+    car_num = wash_data.get('car_number', '—')
+    text = (
+        f"⚠️ **ПОДТВЕРЖДЕНИЕ ВЫЕЗДА ИЗ БОКСА**\n\n"
+        f"📍 **Бокс**: {wash_data['box_name']}\n"
+        f"🔢 **Номер авто**: **{car_num}**\n"
+        f"🚗 **Категория**: {wash_data['service_name']}\n"
+        f"💰 **Сумма к оплате**: **{format_currency(wash_data['price'])}**\n\n"
+        f"❓ **Вы действительно хотите выписать чек и завершить мойку?**"
+    )
+    
+    confirm_kb = InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text=f"✅ Да, выехать ({car_num})", callback_data=f"confirm_finish_wash:{wash_id}")
+        ],
+        [
+            InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_action")
+        ]
+    ])
+    
+    try:
+        await callback.message.edit_text(text, reply_markup=confirm_kb, parse_mode="Markdown")
+    except TelegramBadRequest:
+        await callback.message.answer(text, reply_markup=confirm_kb, parse_mode="Markdown")
+    await callback.answer()
+
+@router.callback_query(F.data.startswith("confirm_finish_wash:"))
+async def confirm_finish_wash_callback(callback: CallbackQuery):
+    """Оформление выезда авто из бокса после подтверждения"""
+    wash_id = int(callback.data.split(":")[1])
+    wash_data = get_wash_by_id(wash_id)
+    
+    if not wash_data or wash_data["status"] == "completed":
+        await callback.answer("⚠️ Заявка уже была закрыта.", show_alert=True)
         return
         
     complete_wash(wash_id)
@@ -319,7 +392,7 @@ async def finish_wash_callback(callback: CallbackQuery):
         f"🕒 **Время выезда**: **{now_time}** *(UTC+5)*"
     )
     
-    await callback.answer("🏁 Заявка закрыта! Выезд зафиксирован.", show_alert=True)
+    await callback.answer("🏁 Выезд зафиксирован! Чек закрыт.", show_alert=True)
     
     try:
         if callback.message:
